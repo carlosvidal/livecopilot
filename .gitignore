@@ -1,0 +1,24 @@
+# Gradle files
+.gradle/
+build/
+/captures/
+.externalNativeBuild/
+.cxx/
+
+# Local configuration file (sdk path, etc)
+local.properties
+
+# Android Studio files
+.idea/
+*.iml
+
+# Signing files
+*.keystore
+*.jks
+
+# APK files
+*.apk
+*.aab
+
+# Proguard
+proguard/
