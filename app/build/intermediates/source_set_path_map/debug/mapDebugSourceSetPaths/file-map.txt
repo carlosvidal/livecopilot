@@ -1,0 +1,34 @@
+com.livecopilot.app-material-1.11.0-0 /Users/carlosvidal/.gradle/caches/8.12/transforms/03d22cfaa6345f594cf3c8c8baa5a55c/transformed/material-1.11.0/res
+com.livecopilot.app-jetified-lifecycle-viewmodel-savedstate-2.6.1-1 /Users/carlosvidal/.gradle/caches/8.12/transforms/04e9261b734849cb80c521c924083641/transformed/jetified-lifecycle-viewmodel-savedstate-2.6.1/res
+com.livecopilot.app-jetified-emoji2-1.2.0-2 /Users/carlosvidal/.gradle/caches/8.12/transforms/060704eaa82a494b6e045a58412b326a/transformed/jetified-emoji2-1.2.0/res
+com.livecopilot.app-lifecycle-livedata-core-2.6.1-3 /Users/carlosvidal/.gradle/caches/8.12/transforms/09a601bf7856981aa74be93905a9b683/transformed/lifecycle-livedata-core-2.6.1/res
+com.livecopilot.app-jetified-appcompat-resources-1.6.1-4 /Users/carlosvidal/.gradle/caches/8.12/transforms/18e657d3213280b4e6011d9f8fb08732/transformed/jetified-appcompat-resources-1.6.1/res
+com.livecopilot.app-jetified-emoji2-views-helper-1.2.0-5 /Users/carlosvidal/.gradle/caches/8.12/transforms/2060f5330dd1f1dd0b8746895a998030/transformed/jetified-emoji2-views-helper-1.2.0/res
+com.livecopilot.app-constraintlayout-2.0.1-6 /Users/carlosvidal/.gradle/caches/8.12/transforms/3429ab7248569361a02cba48008b7992/transformed/constraintlayout-2.0.1/res
+com.livecopilot.app-cardview-1.0.0-7 /Users/carlosvidal/.gradle/caches/8.12/transforms/378f82fc01afb568dfdb684bfed727f2/transformed/cardview-1.0.0/res
+com.livecopilot.app-jetified-savedstate-1.2.1-8 /Users/carlosvidal/.gradle/caches/8.12/transforms/39cdd83ba29c3558d7599a46cce4487c/transformed/jetified-savedstate-1.2.1/res
+com.livecopilot.app-jetified-profileinstaller-1.3.0-9 /Users/carlosvidal/.gradle/caches/8.12/transforms/407cd51c19726295da85ad5401491fbd/transformed/jetified-profileinstaller-1.3.0/res
+com.livecopilot.app-jetified-viewpager2-1.0.0-10 /Users/carlosvidal/.gradle/caches/8.12/transforms/4edc387585bd46c01d1da97ca2e0f664/transformed/jetified-viewpager2-1.0.0/res
+com.livecopilot.app-jetified-activity-1.8.0-11 /Users/carlosvidal/.gradle/caches/8.12/transforms/4f005a17e0739e209d86947ac60c5eee/transformed/jetified-activity-1.8.0/res
+com.livecopilot.app-transition-1.2.0-12 /Users/carlosvidal/.gradle/caches/8.12/transforms/503677baebf42cb8bb81ab51bb4fa3ba/transformed/transition-1.2.0/res
+com.livecopilot.app-recyclerview-1.1.0-13 /Users/carlosvidal/.gradle/caches/8.12/transforms/60dd1bfe2f38de96701d399b092b51f6/transformed/recyclerview-1.1.0/res
+com.livecopilot.app-fragment-1.3.6-14 /Users/carlosvidal/.gradle/caches/8.12/transforms/64fe4e736aa3381403500f2b85b90bed/transformed/fragment-1.3.6/res
+com.livecopilot.app-jetified-core-ktx-1.12.0-15 /Users/carlosvidal/.gradle/caches/8.12/transforms/745565f9e0c59558bec1ec2f193f5ee5/transformed/jetified-core-ktx-1.12.0/res
+com.livecopilot.app-jetified-lifecycle-process-2.6.1-16 /Users/carlosvidal/.gradle/caches/8.12/transforms/8a37fbaabab703962fd99cec009dfa8d/transformed/jetified-lifecycle-process-2.6.1/res
+com.livecopilot.app-jetified-annotation-experimental-1.3.0-17 /Users/carlosvidal/.gradle/caches/8.12/transforms/9f4e4f276c436cf88c47d35beb5be130/transformed/jetified-annotation-experimental-1.3.0/res
+com.livecopilot.app-lifecycle-runtime-2.6.1-18 /Users/carlosvidal/.gradle/caches/8.12/transforms/b10f56858b3559ba5ec48ef057791372/transformed/lifecycle-runtime-2.6.1/res
+com.livecopilot.app-drawerlayout-1.1.1-19 /Users/carlosvidal/.gradle/caches/8.12/transforms/b31ddb77407d8d0059dc674eb3d898e1/transformed/drawerlayout-1.1.1/res
+com.livecopilot.app-appcompat-1.6.1-20 /Users/carlosvidal/.gradle/caches/8.12/transforms/ba72f8a03e4cc6df60f0c9bb25a75942/transformed/appcompat-1.6.1/res
+com.livecopilot.app-core-1.12.0-21 /Users/carlosvidal/.gradle/caches/8.12/transforms/c504dea72f395612a0711ad1ba8aaa3d/transformed/core-1.12.0/res
+com.livecopilot.app-core-runtime-2.2.0-22 /Users/carlosvidal/.gradle/caches/8.12/transforms/cb55120113da69b95b26d30e9476505b/transformed/core-runtime-2.2.0/res
+com.livecopilot.app-jetified-startup-runtime-1.1.1-23 /Users/carlosvidal/.gradle/caches/8.12/transforms/cf2c4e2d84cafcb1b0733c1cc25d2d26/transformed/jetified-startup-runtime-1.1.1/res
+com.livecopilot.app-coordinatorlayout-1.1.0-24 /Users/carlosvidal/.gradle/caches/8.12/transforms/e623326d5c8004c044b91de91e793f82/transformed/coordinatorlayout-1.1.0/res
+com.livecopilot.app-lifecycle-viewmodel-2.6.1-25 /Users/carlosvidal/.gradle/caches/8.12/transforms/f45a8761b58a8dcc8649e084e59407c0/transformed/lifecycle-viewmodel-2.6.1/res
+com.livecopilot.app-lifecycle-livedata-2.6.1-26 /Users/carlosvidal/.gradle/caches/8.12/transforms/f6a19b23652dd3d0ba5e2321b1568534/transformed/lifecycle-livedata-2.6.1/res
+com.livecopilot.app-pngs-27 /Users/carlosvidal/Developer/Live Copilot/app/build/generated/res/pngs/debug
+com.livecopilot.app-resValues-28 /Users/carlosvidal/Developer/Live Copilot/app/build/generated/res/resValues/debug
+com.livecopilot.app-packageDebugResources-29 /Users/carlosvidal/Developer/Live Copilot/app/build/intermediates/incremental/debug/packageDebugResources/merged.dir
+com.livecopilot.app-packageDebugResources-30 /Users/carlosvidal/Developer/Live Copilot/app/build/intermediates/incremental/debug/packageDebugResources/stripped.dir
+com.livecopilot.app-debug-31 /Users/carlosvidal/Developer/Live Copilot/app/build/intermediates/merged_res/debug/mergeDebugResources
+com.livecopilot.app-debug-32 /Users/carlosvidal/Developer/Live Copilot/app/src/debug/res
+com.livecopilot.app-main-33 /Users/carlosvidal/Developer/Live Copilot/app/src/main/res

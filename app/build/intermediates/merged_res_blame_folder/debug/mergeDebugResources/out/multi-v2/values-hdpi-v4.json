@@ -1,0 +1,20 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.livecopilot.app-mergeDebugResources-29:/values-hdpi-v4/values-hdpi-v4.xml",
+            "map": [
+                {
+                    "source": "/Users/carlosvidal/.gradle/caches/8.12/transforms/ba72f8a03e4cc6df60f0c9bb25a75942/transformed/appcompat-1.6.1/res/values-hdpi-v4/values-hdpi-v4.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endLines": "6",
+                        "endColumns": "13",
+                        "endOffsets": "327"
+                    }
+                }
+            ]
+        }
+    ]
+}
