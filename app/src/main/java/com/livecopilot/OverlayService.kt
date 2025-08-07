@@ -31,14 +31,20 @@ class OverlayService : Service() {
     private lateinit var bubbleView: View
     private lateinit var fanView: View
     private lateinit var catalogView: View
+    private lateinit var galleryView: View
+    private lateinit var cartView: View
+    private lateinit var favoritesView: View
     private lateinit var bubbleParams: WindowManager.LayoutParams
     private lateinit var fanParams: WindowManager.LayoutParams
     private lateinit var catalogParams: WindowManager.LayoutParams
+    private lateinit var galleryParams: WindowManager.LayoutParams
+    private lateinit var cartParams: WindowManager.LayoutParams
+    private lateinit var favoritesParams: WindowManager.LayoutParams
 
     private var currentState = BubbleState.COLLAPSED
     
     enum class BubbleState {
-        COLLAPSED, FAN, CATALOG
+        COLLAPSED, FAN, CATALOG, GALLERY, CART, FAVORITES
     }
 
     // Posición persistente de la burbuja
@@ -67,6 +73,15 @@ class OverlayService : Service() {
         }
         if (::catalogView.isInitialized && catalogView.isAttachedToWindow) {
             windowManager.removeView(catalogView)
+        }
+        if (::galleryView.isInitialized && galleryView.isAttachedToWindow) {
+            windowManager.removeView(galleryView)
+        }
+        if (::cartView.isInitialized && cartView.isAttachedToWindow) {
+            windowManager.removeView(cartView)
+        }
+        if (::favoritesView.isInitialized && favoritesView.isAttachedToWindow) {
+            windowManager.removeView(favoritesView)
         }
     }
 
@@ -127,11 +142,38 @@ class OverlayService : Service() {
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT
         ).apply {
-            gravity = Gravity.TOP or Gravity.START
+            gravity = Gravity.CENTER
         }
         setupCatalogViewListeners()
+        
+        // --- Inicializar Gallery Modal ---
+        galleryView = inflater.inflate(R.layout.gallery_modal, null)
+        galleryParams = createCenteredModalParams()
+        setupGalleryViewListeners()
+
+        // --- Inicializar Cart Modal ---
+        cartView = inflater.inflate(R.layout.cart_modal, null)
+        cartParams = createCenteredModalParams()
+        setupCartViewListeners()
+
+        // --- Inicializar Favorites Modal ---
+        favoritesView = inflater.inflate(R.layout.favorites_modal, null)
+        favoritesParams = createCenteredModalParams()
+        setupFavoritesViewListeners()
+        
         loadShortcutsFromPrefs()
         populateCatalogShortcuts()
+    }
+
+    private fun createCenteredModalParams(): WindowManager.LayoutParams {
+        return WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else WindowManager.LayoutParams.TYPE_PHONE,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.CENTER
+        }
     }
 
     private fun showBubble() {
@@ -155,8 +197,8 @@ class OverlayService : Service() {
         val screenHeight = resources.displayMetrics.heightPixels
         val isOnLeftSide = lastBubbleX < screenWidth / 2
         
-        // Radio del abanico reducido 5% para acercar botones al centro
-        val fanRadius = (114 * resources.displayMetrics.density).toInt()
+        // Radio del abanico reducido 10 píxeles más
+        val fanRadius = (98 * resources.displayMetrics.density).toInt()
         
         // Centro del abanico es la posición actual de la burbuja
         val centerX = lastBubbleX + 30  // 30 = 60dp/2 (mitad del bubble)
@@ -199,8 +241,7 @@ class OverlayService : Service() {
     private fun showCatalog() {
         hideAllViews()
         currentState = BubbleState.CATALOG
-        catalogParams.x = lastBubbleX - 100
-        catalogParams.y = lastBubbleY - 100
+        // El catálogo se centra automáticamente con gravity = CENTER
         windowManager.addView(catalogView, catalogParams)
     }
 
@@ -222,6 +263,15 @@ class OverlayService : Service() {
         if (::catalogView.isInitialized && catalogView.isAttachedToWindow) {
             windowManager.removeView(catalogView)
         }
+        if (::galleryView.isInitialized && galleryView.isAttachedToWindow) {
+            windowManager.removeView(galleryView)
+        }
+        if (::cartView.isInitialized && cartView.isAttachedToWindow) {
+            windowManager.removeView(cartView)
+        }
+        if (::favoritesView.isInitialized && favoritesView.isAttachedToWindow) {
+            windowManager.removeView(favoritesView)
+        }
     }
 
     private fun setupFanViewListeners() {
@@ -232,12 +282,10 @@ class OverlayService : Service() {
             showCatalog()
         }
         fanView.findViewById<ImageView>(R.id.btn_gallery).setOnClickListener { 
-            // TODO: Implementar galería
-            Toast.makeText(this, "Galería - Próximamente", Toast.LENGTH_SHORT).show()
+            showGallery()
         }
         fanView.findViewById<ImageView>(R.id.btn_cart).setOnClickListener { 
-            // TODO: Implementar carrito
-            Toast.makeText(this, "Carrito - Próximamente", Toast.LENGTH_SHORT).show()
+            showCart()
         }
         fanView.findViewById<ImageView>(R.id.btn_settings).setOnClickListener { 
             val intent = Intent(this, SettingsActivity::class.java)
@@ -246,8 +294,7 @@ class OverlayService : Service() {
             collapseToBubble()
         }
         fanView.findViewById<ImageView>(R.id.btn_favorites).setOnClickListener { 
-            // TODO: Implementar favoritos
-            Toast.makeText(this, "Favoritos - Próximamente", Toast.LENGTH_SHORT).show()
+            showFavorites()
         }
     }
 
@@ -408,6 +455,42 @@ class OverlayService : Service() {
             val shortcut = prefs.getString("shortcut_$i", defaultShortcuts.getOrElse(i) { "" }) ?: ""
             shortcuts.add(shortcut)
         }
+    }
+
+    private fun setupGalleryViewListeners() {
+        galleryView.findViewById<ImageView>(R.id.btn_close_gallery).setOnClickListener { 
+            showFan()
+        }
+    }
+
+    private fun setupCartViewListeners() {
+        cartView.findViewById<ImageView>(R.id.btn_close_cart).setOnClickListener { 
+            showFan()
+        }
+    }
+
+    private fun setupFavoritesViewListeners() {
+        favoritesView.findViewById<ImageView>(R.id.btn_close_favorites).setOnClickListener { 
+            showFan()
+        }
+    }
+
+    private fun showGallery() {
+        hideAllViews()
+        currentState = BubbleState.GALLERY
+        windowManager.addView(galleryView, galleryParams)
+    }
+
+    private fun showCart() {
+        hideAllViews()
+        currentState = BubbleState.CART
+        windowManager.addView(cartView, cartParams)
+    }
+
+    private fun showFavorites() {
+        hideAllViews()
+        currentState = BubbleState.FAVORITES
+        windowManager.addView(favoritesView, favoritesParams)
     }
 
     private fun isAClick(startX: Float, endX: Float, startY: Float, endY: Float): Boolean {

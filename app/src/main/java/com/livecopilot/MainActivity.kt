@@ -5,8 +5,10 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.Toolbar
 
 
 class MainActivity : AppCompatActivity() {
@@ -14,6 +16,15 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        // Configurar toolbar
+        val toolbar = findViewById<Toolbar>(R.id.toolbar)
+        setSupportActionBar(toolbar)
+
+        setupButtons()
+    }
+
+    private fun setupButtons() {
+        // Botón principal
         val startBtn = findViewById<Button>(R.id.btn_start)
         startBtn.setOnClickListener {
             if (!Settings.canDrawOverlays(this)) {
@@ -25,6 +36,27 @@ class MainActivity : AppCompatActivity() {
             } else {
                 startOverlayService()
             }
+        }
+
+        // Botón Catálogo
+        findViewById<FrameLayout>(R.id.btn_catalog).setOnClickListener {
+            Toast.makeText(this, "Catálogo - Funcionalidad disponible en la burbuja flotante", Toast.LENGTH_SHORT).show()
+        }
+
+        // Botón Galería
+        findViewById<FrameLayout>(R.id.btn_gallery).setOnClickListener {
+            Toast.makeText(this, "Galería - Próximamente", Toast.LENGTH_SHORT).show()
+        }
+
+        // Botón Favoritos
+        findViewById<FrameLayout>(R.id.btn_favorites).setOnClickListener {
+            Toast.makeText(this, "Favoritos - Próximamente", Toast.LENGTH_SHORT).show()
+        }
+
+        // Botón Settings
+        findViewById<FrameLayout>(R.id.btn_settings).setOnClickListener {
+            val intent = Intent(this, SettingsActivity::class.java)
+            startActivity(intent)
         }
     }
 
