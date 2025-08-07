@@ -42,8 +42,8 @@ class OverlayService : Service() {
     }
 
     // Posición persistente de la burbuja
-    private var lastBubbleX = 50
-    private var lastBubbleY = 200
+    private var lastBubbleX = 0   // Pegado al borde izquierdo
+    private var lastBubbleY = 300 // Más abajo para dar espacio al abanico
 
     private val shortcuts = mutableListOf<String>()
 
@@ -155,8 +155,8 @@ class OverlayService : Service() {
         val screenHeight = resources.displayMetrics.heightPixels
         val isOnLeftSide = lastBubbleX < screenWidth / 2
         
-        // Radio del abanico más grande para evitar solapamiento
-        val fanRadius = (120 * resources.displayMetrics.density).toInt()
+        // Radio del abanico reducido 5% para acercar botones al centro
+        val fanRadius = (114 * resources.displayMetrics.density).toInt()
         
         // Centro del abanico es la posición actual de la burbuja
         val centerX = lastBubbleX + 30  // 30 = 60dp/2 (mitad del bubble)
