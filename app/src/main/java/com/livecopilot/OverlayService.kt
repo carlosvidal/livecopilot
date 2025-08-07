@@ -7,6 +7,8 @@ import android.app.Service
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.provider.Settings
+import android.text.TextUtils
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
@@ -250,7 +252,12 @@ class OverlayService : Service() {
             number.background.setTint(rainbowColors[index % rainbowColors.size])
             btn.setOnClickListener {
                 copyToClipboard(text)
-                Toast.makeText(this, "Mensaje copiado", Toast.LENGTH_SHORT).show()
+                val message = if (isAccessibilityServiceEnabled()) {
+                    "Texto pegado automáticamente"
+                } else {
+                    "Copiado al portapapeles - mantén presionado en WhatsApp para pegar"
+                }
+                Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
                 collapse()
             }
             shortcutsLayout.addView(btn)
@@ -258,9 +265,35 @@ class OverlayService : Service() {
     }
 
     private fun copyToClipboard(text: String) {
-        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        val clip = ClipData.newPlainText("LiveCopilot Shortcut", text)
-        clipboard.setPrimaryClip(clip)
+        if (isAccessibilityServiceEnabled()) {
+            // Usar servicio de accesibilidad para pegado automático
+            val intent = Intent(this, AutoPasteAccessibilityService::class.java)
+            intent.action = AutoPasteAccessibilityService.ACTION_PASTE_TEXT
+            intent.putExtra(AutoPasteAccessibilityService.EXTRA_TEXT, text)
+            startService(intent)
+        } else {
+            // Fallback: copiar al portapapeles
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip = ClipData.newPlainText("LiveCopilot", text)
+            clipboard.setPrimaryClip(clip)
+        }
+    }
+
+    private fun isAccessibilityServiceEnabled(): Boolean {
+        val accessibilityEnabled = try {
+            Settings.Secure.getInt(contentResolver, Settings.Secure.ACCESSIBILITY_ENABLED)
+        } catch (e: Settings.SettingNotFoundException) {
+            0
+        }
+
+        if (accessibilityEnabled == 1) {
+            val services = Settings.Secure.getString(
+                contentResolver,
+                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+            )
+            return services?.contains("${packageName}/${AutoPasteAccessibilityService::class.java.name}") == true
+        }
+        return false
     }
 
     private fun loadShortcutsFromPrefs() {

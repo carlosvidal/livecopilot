@@ -2,4 +2,5 @@
 <resources>
     <string name="app_name">LiveCopilot</string>
     <string name="start">Iniciar LiveCopilot</string>
+    <string name="accessibility_service_description">LiveCopilot necesita acceso de accesibilidad para pegar texto automáticamente en otras aplicaciones como WhatsApp</string>
 </resources>
