@@ -1,0 +1,362 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/shortcut_bg"
+    android:padding="16dp">
+
+    <!-- Header con botones Back y Close -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="12dp">
+
+        <ImageView
+            android:id="@+id/btn_back"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="@drawable/gray_circle_bg"
+            android:src="@drawable/ic_back"
+            android:scaleType="center"
+            android:padding="6dp"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <ImageView
+            android:id="@+id/btn_close_catalog"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="@drawable/gray_circle_bg"
+            android:src="@drawable/ic_close"
+            android:scaleType="center"
+            android:padding="6dp"
+            android:clickable="true"
+            android:focusable="true" />
+
+    </LinearLayout>
+
+    <!-- Grid 4x3 para los shortcuts -->
+    <LinearLayout
+        android:id="@+id/shortcuts_grid"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+        
+        <!-- Fila 1 -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+            
+            <FrameLayout
+                android:id="@+id/shortcut_0"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/shortcut_bg"
+                android:clickable="true"
+                android:focusable="true">
+                
+                <TextView
+                    android:id="@+id/shortcut_number_0"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/shortcut_circle_bg"
+                    android:text="1"
+                    android:textColor="@android:color/white"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:gravity="center" />
+                    
+            </FrameLayout>
+            
+            <FrameLayout
+                android:id="@+id/shortcut_1"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/shortcut_bg"
+                android:clickable="true"
+                android:focusable="true">
+                
+                <TextView
+                    android:id="@+id/shortcut_number_1"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/shortcut_circle_bg"
+                    android:text="2"
+                    android:textColor="@android:color/white"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:gravity="center" />
+                    
+            </FrameLayout>
+            
+            <FrameLayout
+                android:id="@+id/shortcut_2"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:background="@drawable/shortcut_bg"
+                android:clickable="true"
+                android:focusable="true">
+                
+                <TextView
+                    android:id="@+id/shortcut_number_2"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/shortcut_circle_bg"
+                    android:text="3"
+                    android:textColor="@android:color/white"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:gravity="center" />
+                    
+            </FrameLayout>
+            
+        </LinearLayout>
+        
+        <!-- Fila 2 -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+            
+            <FrameLayout
+                android:id="@+id/shortcut_3"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/shortcut_bg"
+                android:clickable="true"
+                android:focusable="true">
+                
+                <TextView
+                    android:id="@+id/shortcut_number_3"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/shortcut_circle_bg"
+                    android:text="4"
+                    android:textColor="@android:color/white"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:gravity="center" />
+                    
+            </FrameLayout>
+            
+            <FrameLayout
+                android:id="@+id/shortcut_4"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/shortcut_bg"
+                android:clickable="true"
+                android:focusable="true">
+                
+                <TextView
+                    android:id="@+id/shortcut_number_4"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/shortcut_circle_bg"
+                    android:text="5"
+                    android:textColor="@android:color/white"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:gravity="center" />
+                    
+            </FrameLayout>
+            
+            <FrameLayout
+                android:id="@+id/shortcut_5"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:background="@drawable/shortcut_bg"
+                android:clickable="true"
+                android:focusable="true">
+                
+                <TextView
+                    android:id="@+id/shortcut_number_5"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/shortcut_circle_bg"
+                    android:text="6"
+                    android:textColor="@android:color/white"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:gravity="center" />
+                    
+            </FrameLayout>
+            
+        </LinearLayout>
+
+        <!-- Fila 3 -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+            
+            <FrameLayout
+                android:id="@+id/shortcut_6"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/shortcut_bg"
+                android:clickable="true"
+                android:focusable="true">
+                
+                <TextView
+                    android:id="@+id/shortcut_number_6"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/shortcut_circle_bg"
+                    android:text="7"
+                    android:textColor="@android:color/white"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:gravity="center" />
+                    
+            </FrameLayout>
+            
+            <FrameLayout
+                android:id="@+id/shortcut_7"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/shortcut_bg"
+                android:clickable="true"
+                android:focusable="true">
+                
+                <TextView
+                    android:id="@+id/shortcut_number_7"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/shortcut_circle_bg"
+                    android:text="8"
+                    android:textColor="@android:color/white"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:gravity="center" />
+                    
+            </FrameLayout>
+            
+            <FrameLayout
+                android:id="@+id/shortcut_8"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:background="@drawable/shortcut_bg"
+                android:clickable="true"
+                android:focusable="true">
+                
+                <TextView
+                    android:id="@+id/shortcut_number_8"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/shortcut_circle_bg"
+                    android:text="9"
+                    android:textColor="@android:color/white"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:gravity="center" />
+                    
+            </FrameLayout>
+            
+        </LinearLayout>
+
+        <!-- Fila 4 -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            
+            <FrameLayout
+                android:id="@+id/shortcut_9"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/shortcut_bg"
+                android:clickable="true"
+                android:focusable="true">
+                
+                <TextView
+                    android:id="@+id/shortcut_number_9"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/shortcut_circle_bg"
+                    android:text="10"
+                    android:textColor="@android:color/white"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:gravity="center" />
+                    
+            </FrameLayout>
+            
+            <FrameLayout
+                android:id="@+id/shortcut_10"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/shortcut_bg"
+                android:clickable="true"
+                android:focusable="true">
+                
+                <TextView
+                    android:id="@+id/shortcut_number_10"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/shortcut_circle_bg"
+                    android:text="11"
+                    android:textColor="@android:color/white"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:gravity="center" />
+                    
+            </FrameLayout>
+            
+            <FrameLayout
+                android:id="@+id/shortcut_11"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:background="@drawable/shortcut_bg"
+                android:clickable="true"
+                android:focusable="true">
+                
+                <TextView
+                    android:id="@+id/shortcut_number_11"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/shortcut_circle_bg"
+                    android:text="12"
+                    android:textColor="@android:color/white"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:gravity="center" />
+                    
+            </FrameLayout>
+            
+        </LinearLayout>
+        
+    </LinearLayout>
+
+</LinearLayout>
