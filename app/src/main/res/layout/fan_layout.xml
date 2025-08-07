@@ -4,27 +4,15 @@
     android:layout_height="match_parent"
     android:background="@android:color/transparent">
 
-    <!-- Centro del abanico - Burbuja principal -->
-    <ImageView
-        android:id="@+id/center_bubble"
-        android:layout_width="60dp"
-        android:layout_height="60dp"
-        android:layout_gravity="center"
-        android:background="@drawable/bubble_bg"
-        android:src="@drawable/ic_shortcut"
-        android:scaleType="center"
-        android:padding="16dp" />
-
-    <!-- Botón Cerrar - Encima de la burbuja original -->
+    <!-- Botón Cerrar - Reemplaza la burbuja en su posición original -->
     <ImageView
         android:id="@+id/btn_close"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:layout_gravity="center"
-        android:background="@drawable/gray_circle_bg"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:background="@drawable/bubble_bg"
         android:src="@drawable/ic_close"
         android:scaleType="center"
-        android:padding="12dp"
+        android:padding="16dp"
         android:clickable="true"
         android:focusable="true" />
 

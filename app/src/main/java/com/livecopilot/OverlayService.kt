@@ -162,18 +162,11 @@ class OverlayService : Service() {
         val centerX = lastBubbleX + 30  // 30 = 60dp/2 (mitad del bubble)
         val centerY = lastBubbleY + 30  // 30 = 60dp/2 (mitad del bubble)
         
-        // Posicionar la burbuja central en el fan layout
-        val centerBubble = fanView.findViewById<ImageView>(R.id.center_bubble)
+        // Posicionar el botón cerrar exactamente donde estaba la burbuja
         val centerCloseBtn = fanView.findViewById<ImageView>(R.id.btn_close)
-        
-        val centerBubbleParams = centerBubble.layoutParams as FrameLayout.LayoutParams
-        centerBubbleParams.leftMargin = lastBubbleX
-        centerBubbleParams.topMargin = lastBubbleY
-        centerBubble.layoutParams = centerBubbleParams
-        
         val centerCloseParams = centerCloseBtn.layoutParams as FrameLayout.LayoutParams
-        centerCloseParams.leftMargin = lastBubbleX + 6  // Centrar el botón de 48dp sobre la burbuja de 60dp
-        centerCloseParams.topMargin = lastBubbleY + 6
+        centerCloseParams.leftMargin = lastBubbleX
+        centerCloseParams.topMargin = lastBubbleY
         centerCloseBtn.layoutParams = centerCloseParams
         
         // Botones del abanico
