@@ -25,18 +25,25 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
+import androidx.core.content.FileProvider
+import com.livecopilot.data.Product
+import com.livecopilot.data.ProductManager
+import com.livecopilot.utils.ImageUtils
+import java.io.File
 
 class OverlayService : Service() {
     private lateinit var windowManager: WindowManager
     private lateinit var bubbleView: View
     private lateinit var fanView: View
     private lateinit var catalogView: View
+    private lateinit var productsCatalogView: View
     private lateinit var galleryView: View
     private lateinit var cartView: View
     private lateinit var favoritesView: View
     private lateinit var bubbleParams: WindowManager.LayoutParams
     private lateinit var fanParams: WindowManager.LayoutParams
     private lateinit var catalogParams: WindowManager.LayoutParams
+    private lateinit var productsCatalogParams: WindowManager.LayoutParams
     private lateinit var galleryParams: WindowManager.LayoutParams
     private lateinit var cartParams: WindowManager.LayoutParams
     private lateinit var favoritesParams: WindowManager.LayoutParams
@@ -44,7 +51,7 @@ class OverlayService : Service() {
     private var currentState = BubbleState.COLLAPSED
     
     enum class BubbleState {
-        COLLAPSED, FAN, CATALOG, GALLERY, CART, FAVORITES
+        COLLAPSED, FAN, CATALOG, PRODUCTS_CATALOG, GALLERY, CART, FAVORITES
     }
 
     // Posición persistente de la burbuja
@@ -52,14 +59,33 @@ class OverlayService : Service() {
     private var lastBubbleY = 300 // Más abajo para dar espacio al abanico
 
     private val shortcuts = mutableListOf<String>()
+    private lateinit var productManager: ProductManager
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
+        productManager = ProductManager(this)
         startInForeground()
         initViews()
         showBubble()
+    }
+    
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        intent?.let {
+            when (it.action) {
+                ACTION_SHOW_BUBBLE -> {
+                    if (currentState == BubbleState.COLLAPSED && !bubbleView.isAttachedToWindow) {
+                        showBubble()
+                    }
+                }
+            }
+        }
+        return START_STICKY
+    }
+    
+    companion object {
+        const val ACTION_SHOW_BUBBLE = "SHOW_BUBBLE"
     }
 
     override fun onDestroy() {
@@ -73,6 +99,9 @@ class OverlayService : Service() {
         }
         if (::catalogView.isInitialized && catalogView.isAttachedToWindow) {
             windowManager.removeView(catalogView)
+        }
+        if (::productsCatalogView.isInitialized && productsCatalogView.isAttachedToWindow) {
+            windowManager.removeView(productsCatalogView)
         }
         if (::galleryView.isInitialized && galleryView.isAttachedToWindow) {
             windowManager.removeView(galleryView)
@@ -145,6 +174,11 @@ class OverlayService : Service() {
             gravity = Gravity.CENTER
         }
         setupCatalogViewListeners()
+        
+        // --- Inicializar Products Catalog Modal ---
+        productsCatalogView = inflater.inflate(R.layout.products_catalog_modal, null)
+        productsCatalogParams = createCenteredModalParams()
+        setupProductsCatalogViewListeners()
         
         // --- Inicializar Gallery Modal ---
         galleryView = inflater.inflate(R.layout.gallery_modal, null)
@@ -245,6 +279,13 @@ class OverlayService : Service() {
         windowManager.addView(catalogView, catalogParams)
     }
 
+    private fun showProductsCatalog() {
+        hideAllViews()
+        currentState = BubbleState.PRODUCTS_CATALOG
+        populateProductsCatalog()
+        windowManager.addView(productsCatalogView, productsCatalogParams)
+    }
+
     private fun collapseToBubble() {
         hideAllViews()
         currentState = BubbleState.COLLAPSED
@@ -263,6 +304,9 @@ class OverlayService : Service() {
         if (::catalogView.isInitialized && catalogView.isAttachedToWindow) {
             windowManager.removeView(catalogView)
         }
+        if (::productsCatalogView.isInitialized && productsCatalogView.isAttachedToWindow) {
+            windowManager.removeView(productsCatalogView)
+        }
         if (::galleryView.isInitialized && galleryView.isAttachedToWindow) {
             windowManager.removeView(galleryView)
         }
@@ -279,22 +323,31 @@ class OverlayService : Service() {
             collapseToBubble()
         }
         fanView.findViewById<ImageView>(R.id.btn_catalog).setOnClickListener { 
-            showCatalog()
+            showProductsCatalog()
         }
         fanView.findViewById<ImageView>(R.id.btn_gallery).setOnClickListener { 
-            showGallery()
+            val intent = Intent(this, GalleryActivity::class.java)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
+            collapseToBubble()
         }
         fanView.findViewById<ImageView>(R.id.btn_cart).setOnClickListener { 
             showCart()
         }
         fanView.findViewById<ImageView>(R.id.btn_settings).setOnClickListener { 
-            val intent = Intent(this, SettingsActivity::class.java)
+            val intent = Intent(this, MainActivity::class.java)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            startActivity(intent)
+            
+            // Ocultar completamente la burbuja
+            hideAllViews()
+            currentState = BubbleState.COLLAPSED
+        }
+        fanView.findViewById<ImageView>(R.id.btn_favorites).setOnClickListener { 
+            val intent = Intent(this, FavoritesActivity::class.java)
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             startActivity(intent)
             collapseToBubble()
-        }
-        fanView.findViewById<ImageView>(R.id.btn_favorites).setOnClickListener { 
-            showFavorites()
         }
     }
 
@@ -303,6 +356,12 @@ class OverlayService : Service() {
             showFan()
         }
         catalogView.findViewById<ImageView>(R.id.btn_close_catalog).setOnClickListener { 
+            collapseToBubble()
+        }
+    }
+
+    private fun setupProductsCatalogViewListeners() {
+        productsCatalogView.findViewById<ImageView>(R.id.btn_close_products_catalog).setOnClickListener { 
             collapseToBubble()
         }
     }
@@ -497,5 +556,173 @@ class OverlayService : Service() {
         val differenceX = Math.abs(startX - endX)
         val differenceY = Math.abs(startY - endY)
         return differenceX <= 5 && differenceY <= 5
+    }
+
+    private fun populateProductsCatalog() {
+        val products = productManager.getAllProducts()
+        val gridContainer = productsCatalogView.findViewById<LinearLayout>(R.id.products_grid_container)
+        val emptyMessage = productsCatalogView.findViewById<TextView>(R.id.empty_products_message)
+        
+        // Limpiar contenido anterior
+        gridContainer.removeAllViews()
+        
+        if (products.isEmpty()) {
+            emptyMessage.visibility = View.VISIBLE
+            return
+        }
+        
+        emptyMessage.visibility = View.GONE
+        
+        // Crear grid de productos (3 columnas)
+        val columnsCount = 3
+        val imageSize = (80 * resources.displayMetrics.density).toInt() // 80dp
+        val marginSize = (8 * resources.displayMetrics.density).toInt() // 8dp
+        
+        var currentRow: LinearLayout? = null
+        products.forEachIndexed { index, product ->
+            
+            // Crear nueva fila cada 3 productos
+            if (index % columnsCount == 0) {
+                currentRow = LinearLayout(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        setMargins(0, 0, 0, marginSize)
+                    }
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = android.view.Gravity.CENTER_HORIZONTAL
+                }
+                gridContainer.addView(currentRow)
+            }
+            
+            // Crear vista de producto (imagen clickeable)
+            val productImageView = ImageView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(imageSize, imageSize).apply {
+                    setMargins(marginSize, 0, marginSize, 0)
+                }
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                background = resources.getDrawable(R.drawable.shortcut_bg, null)
+                isClickable = true
+                isFocusable = true
+                
+                // Cargar imagen del producto
+                if (product.imageUri.isNotEmpty()) {
+                    try {
+                        val uri = ImageUtils.getImageUri(this@OverlayService, product.imageUri)
+                        if (uri != null) {
+                            setImageURI(uri)
+                        } else {
+                            setImageResource(R.drawable.ic_box)
+                        }
+                    } catch (e: Exception) {
+                        setImageResource(R.drawable.ic_box)
+                    }
+                } else {
+                    setImageResource(R.drawable.ic_box)
+                }
+                
+                // Click listener para copiar y pegar producto
+                setOnClickListener {
+                    copyProductToClipboard(product)
+                }
+            }
+            
+            currentRow?.addView(productImageView)
+        }
+    }
+    
+    private fun copyProductToClipboard(product: Product) {
+        // Crear texto completo del producto
+        val productText = buildString {
+            append("🛍️ ${product.name}")
+            if (product.description.isNotEmpty()) {
+                append("\n📝 ${product.description}")
+            }
+            if (product.price > 0) {
+                append("\n💰 \$${String.format("%.2f", product.price)}")
+            }
+            if (product.link.isNotEmpty()) {
+                append("\n🔗 ${product.link}")
+            }
+        }
+        
+        // Estrategia simplificada: siempre copiar texto al portapapeles y abrir WhatsApp con imagen
+        copyTextToClipboard(productText)
+        
+        if (product.imageUri.isNotEmpty()) {
+            // Abrir WhatsApp con la imagen
+            openWhatsAppWithImage(product.imageUri, productText)
+        } else {
+            // Solo texto, usar servicio de accesibilidad si está disponible
+            if (isAccessibilityServiceEnabled()) {
+                val intent = Intent(this, AutoPasteAccessibilityService::class.java)
+                intent.action = AutoPasteAccessibilityService.ACTION_PASTE_TEXT
+                intent.putExtra(AutoPasteAccessibilityService.EXTRA_TEXT, productText)
+                startService(intent)
+            }
+        }
+        
+        collapseToBubble()
+    }
+    
+    private fun copyTextToClipboard(text: String) {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = ClipData.newPlainText("LiveCopilot Product", text)
+        clipboard.setPrimaryClip(clip)
+    }
+    
+    private fun openWhatsAppWithImage(imagePath: String, text: String) {
+        try {
+            // Crear URI segura usando FileProvider
+            val imageFile = File(imagePath)
+            if (!imageFile.exists()) {
+                // Si no existe el archivo, solo pegar texto
+                return
+            }
+            
+            val imageUri = FileProvider.getUriForFile(
+                this,
+                "com.livecopilot.fileprovider",
+                imageFile
+            )
+            
+            // Intent para compartir imagen con texto
+            val shareIntent = Intent().apply {
+                action = Intent.ACTION_SEND
+                type = "image/*"
+                putExtra(Intent.EXTRA_STREAM, imageUri)
+                putExtra(Intent.EXTRA_TEXT, text)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            
+            // Intentar abrir WhatsApp directamente
+            val whatsappPackages = listOf("com.whatsapp", "com.whatsapp.w4b")
+            var opened = false
+            
+            for (packageName in whatsappPackages) {
+                try {
+                    shareIntent.setPackage(packageName)
+                    startActivity(shareIntent)
+                    opened = true
+                    break
+                } catch (e: Exception) {
+                    // Continuar con el siguiente package
+                }
+            }
+            
+            if (!opened) {
+                // Si no se pudo abrir WhatsApp, usar selector
+                shareIntent.setPackage(null)
+                val chooser = Intent.createChooser(shareIntent, "Enviar producto por:")
+                chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(chooser)
+            }
+            
+        } catch (e: Exception) {
+            // Si falla todo, el texto ya está en portapapeles
+            e.printStackTrace()
+        }
     }
 }

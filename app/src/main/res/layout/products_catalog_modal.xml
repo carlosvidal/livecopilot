@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="320dp"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/shortcut_bg"
+    android:padding="16dp">
+
+    <!-- Header con título y botón cerrar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="12dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Catálogo de Productos"
+            android:textColor="@android:color/black"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:gravity="center" />
+
+        <ImageView
+            android:id="@+id/btn_close_products_catalog"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="@drawable/gray_circle_bg"
+            android:src="@drawable/ic_close"
+            android:scaleType="center"
+            android:padding="6dp"
+            android:clickable="true"
+            android:focusable="true" />
+
+    </LinearLayout>
+
+    <!-- ScrollView para contener el grid de productos -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="400dp"
+        android:fillViewport="false">
+
+        <!-- Grid container que será llenado dinámicamente -->
+        <LinearLayout
+            android:id="@+id/products_grid_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- Este contenedor será llenado dinámicamente con productos -->
+
+        </LinearLayout>
+
+    </ScrollView>
+
+    <!-- Mensaje cuando no hay productos -->
+    <TextView
+        android:id="@+id/empty_products_message"
+        android:layout_width="match_parent"
+        android:layout_height="100dp"
+        android:text="No tienes productos en tu catálogo.\n¡Agrega productos desde la app principal!"
+        android:textColor="@android:color/darker_gray"
+        android:textSize="14sp"
+        android:gravity="center"
+        android:visibility="gone" />
+
+</LinearLayout>

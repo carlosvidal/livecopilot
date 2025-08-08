@@ -22,7 +22,7 @@
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:background="@drawable/gray_circle_bg"
-        android:src="@drawable/ic_grid"
+        android:src="@drawable/ic_box"
         android:scaleType="center"
         android:padding="12dp"
         android:clickable="true"
