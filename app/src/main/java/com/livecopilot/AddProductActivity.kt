@@ -15,11 +15,14 @@ import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import com.livecopilot.data.Product
 import com.livecopilot.data.ProductManager
 import com.livecopilot.utils.ImageUtils
+import java.io.File
 import java.text.DecimalFormat
 
 class AddProductActivity : AppCompatActivity() {
@@ -40,7 +43,7 @@ class AddProductActivity : AppCompatActivity() {
     private var selectedImageUri: Uri? = null
     private var copiedImagePath: String? = null // Ruta de la imagen copiada al almacenamiento interno
     
-    // ActivityResultLauncher para selección de imagen
+    // ActivityResultLauncher para selección de imagen de galería
     private val imagePickerLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri ->
@@ -50,14 +53,34 @@ class AddProductActivity : AppCompatActivity() {
         }
     }
     
-    // ActivityResultLauncher para permisos
-    private val permissionLauncher = registerForActivityResult(
+    // ActivityResultLauncher para tomar foto con cámara
+    private val cameraLauncher = registerForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && selectedImageUri != null) {
+            copyImageToInternalStorage()
+        }
+    }
+    
+    // ActivityResultLauncher para permisos de galería
+    private val galleryPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            openImagePicker()
+            imagePickerLauncher.launch("image/*")
         } else {
-            Toast.makeText(this, "Permiso necesario para seleccionar imágenes", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Permiso necesario para acceder a la galería", Toast.LENGTH_SHORT).show()
+        }
+    }
+    
+    // ActivityResultLauncher para permisos de cámara
+    private val cameraPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            launchCamera()
+        } else {
+            Toast.makeText(this, "Permiso de cámara necesario para tomar fotos", Toast.LENGTH_SHORT).show()
         }
     }
     
@@ -121,6 +144,54 @@ class AddProductActivity : AppCompatActivity() {
     }
     
     private fun checkPermissionAndOpenPicker() {
+        showImageSourceDialog()
+    }
+    
+    private fun showImageSourceDialog() {
+        val options = arrayOf("📸 Tomar foto", "🖼️ Seleccionar de galería")
+        
+        AlertDialog.Builder(this)
+            .setTitle("Seleccionar imagen")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> openCamera()
+                    1 -> openGallery()
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+    
+    private fun openCamera() {
+        when {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED -> {
+                launchCamera()
+            }
+            else -> {
+                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            }
+        }
+    }
+    
+    private fun launchCamera() {
+        try {
+            // Crear archivo temporal para la foto
+            val photoFile = File(cacheDir, "temp_photo_${System.currentTimeMillis()}.jpg")
+            selectedImageUri = FileProvider.getUriForFile(
+                this,
+                "com.livecopilot.fileprovider",
+                photoFile
+            )
+            
+            selectedImageUri?.let { uri ->
+                cameraLauncher.launch(uri)
+            }
+        } catch (e: Exception) {
+            Toast.makeText(this, "Error al inicializar la cámara", Toast.LENGTH_SHORT).show()
+        }
+    }
+    
+    private fun openGallery() {
         val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             Manifest.permission.READ_MEDIA_IMAGES
         } else {
@@ -129,16 +200,12 @@ class AddProductActivity : AppCompatActivity() {
         
         when {
             ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED -> {
-                openImagePicker()
+                imagePickerLauncher.launch("image/*")
             }
             else -> {
-                permissionLauncher.launch(permission)
+                galleryPermissionLauncher.launch(permission)
             }
         }
-    }
-    
-    private fun openImagePicker() {
-        imagePickerLauncher.launch("image/*")
     }
     
     private fun copyImageToInternalStorage() {

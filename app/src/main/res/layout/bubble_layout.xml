@@ -8,7 +8,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:src="@mipmap/ic_launcher_round"
-        android:background="@drawable/bubble_bg"
+        android:background="@drawable/bubble_shadow_bg"
         android:scaleType="centerInside"/>
 
 </FrameLayout>

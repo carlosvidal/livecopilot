@@ -8,8 +8,10 @@ import java.util.UUID
 
 class ProductManager(private val context: Context) {
     
-    private val prefs: SharedPreferences = context.getSharedPreferences("livecopilot_products", Context.MODE_PRIVATE)
-    private val gson = Gson()
+    private val prefs: SharedPreferences by lazy { 
+        context.getSharedPreferences("livecopilot_products", Context.MODE_PRIVATE) 
+    }
+    private val gson by lazy { Gson() }
     
     companion object {
         private const val KEY_PRODUCTS = "products"

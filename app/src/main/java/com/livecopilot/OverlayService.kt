@@ -12,6 +12,8 @@ import android.text.TextUtils
 import kotlin.math.*
 import android.content.Intent
 import android.graphics.PixelFormat
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.IBinder
 import android.view.Gravity
@@ -19,6 +21,7 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -28,7 +31,14 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.FileProvider
 import com.livecopilot.data.Product
 import com.livecopilot.data.ProductManager
+import com.livecopilot.data.CartManager
+import com.livecopilot.data.ImageManager
+import com.livecopilot.data.GalleryImage
 import com.livecopilot.utils.ImageUtils
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.StaggeredGridLayoutManager
 import java.io.File
 
 class OverlayService : Service() {
@@ -37,6 +47,7 @@ class OverlayService : Service() {
     private lateinit var fanView: View
     private lateinit var catalogView: View
     private lateinit var productsCatalogView: View
+    private lateinit var shareDialogView: View
     private lateinit var galleryView: View
     private lateinit var cartView: View
     private lateinit var favoritesView: View
@@ -44,6 +55,7 @@ class OverlayService : Service() {
     private lateinit var fanParams: WindowManager.LayoutParams
     private lateinit var catalogParams: WindowManager.LayoutParams
     private lateinit var productsCatalogParams: WindowManager.LayoutParams
+    private lateinit var shareDialogParams: WindowManager.LayoutParams
     private lateinit var galleryParams: WindowManager.LayoutParams
     private lateinit var cartParams: WindowManager.LayoutParams
     private lateinit var favoritesParams: WindowManager.LayoutParams
@@ -51,8 +63,10 @@ class OverlayService : Service() {
     private var currentState = BubbleState.COLLAPSED
     
     enum class BubbleState {
-        COLLAPSED, FAN, CATALOG, PRODUCTS_CATALOG, GALLERY, CART, FAVORITES
+        COLLAPSED, FAN, CATALOG, PRODUCTS_CATALOG, SHARE_DIALOG, GALLERY, CART, FAVORITES
     }
+    
+    private var selectedProduct: Product? = null
 
     // Posición persistente de la burbuja
     private var lastBubbleX = 0   // Pegado al borde izquierdo
@@ -60,15 +74,26 @@ class OverlayService : Service() {
 
     private val shortcuts = mutableListOf<String>()
     private lateinit var productManager: ProductManager
+    private lateinit var cartManager: CartManager
+    private lateinit var cartAdapter: CartAdapter
+    private lateinit var imageManager: ImageManager
+    private lateinit var galleryModalAdapter: GalleryModalAdapter
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
-        productManager = ProductManager(this)
         startInForeground()
-        initViews()
+        initCriticalViews() // Solo burbuja y abanico inicialmente
         showBubble()
+        
+        // Inicializar ProductManager, CartManager y otras vistas en segundo plano
+        Thread {
+            productManager = ProductManager(this)
+            cartManager = CartManager(this)
+            imageManager = ImageManager(this)
+            initSecondaryViews() // Modales y diálogos después
+        }.start()
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -103,6 +128,9 @@ class OverlayService : Service() {
         if (::productsCatalogView.isInitialized && productsCatalogView.isAttachedToWindow) {
             windowManager.removeView(productsCatalogView)
         }
+        if (::shareDialogView.isInitialized && shareDialogView.isAttachedToWindow) {
+            windowManager.removeView(shareDialogView)
+        }
         if (::galleryView.isInitialized && galleryView.isAttachedToWindow) {
             windowManager.removeView(galleryView)
         }
@@ -130,11 +158,11 @@ class OverlayService : Service() {
         startForeground(1, notification)
     }
 
-    private fun initViews() {
+    private fun initCriticalViews() {
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         val inflater = getSystemService(LAYOUT_INFLATER_SERVICE) as LayoutInflater
 
-        // --- Inicializar y configurar Bubble View ---
+        // --- Inicializar y configurar Bubble View (CRÍTICO) ---
         bubbleView = inflater.inflate(R.layout.bubble_layout, null)
         val sizePx = (48 * resources.displayMetrics.density).toInt()
         bubbleParams = WindowManager.LayoutParams(
@@ -149,7 +177,7 @@ class OverlayService : Service() {
         }
         setupBubbleTouchListener()
 
-        // --- Inicializar y configurar Fan View ---
+        // --- Inicializar y configurar Fan View (CRÍTICO) ---
         fanView = inflater.inflate(R.layout.fan_layout, null)
         fanParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT,
@@ -162,41 +190,76 @@ class OverlayService : Service() {
             y = 0
         }
         setupFanViewListeners()
+    }
+    
+    private fun initSecondaryViews() {
+        runOnUiThread {
+            try {
+                val inflater = getSystemService(LAYOUT_INFLATER_SERVICE) as LayoutInflater
 
-        // --- Inicializar y configurar Catalog View ---
-        catalogView = inflater.inflate(R.layout.catalog_layout, null)
-        catalogParams = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else WindowManager.LayoutParams.TYPE_PHONE,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.CENTER
+                // --- Inicializar y configurar Catalog View ---
+                catalogView = inflater.inflate(R.layout.catalog_layout, null)
+                catalogParams = WindowManager.LayoutParams(
+                    WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else WindowManager.LayoutParams.TYPE_PHONE,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                    PixelFormat.TRANSLUCENT
+                ).apply {
+                    gravity = Gravity.CENTER
+                }
+                setupCatalogViewListeners()
+
+                // --- Inicializar Products Catalog Modal ---
+                productsCatalogView = inflater.inflate(R.layout.products_catalog_modal, null)
+                productsCatalogParams = createCenteredModalParams().apply {
+                    // 80% del ancho de la pantalla
+                    width = (resources.displayMetrics.widthPixels * 0.8f).toInt()
+                    // Oscurecer fondo detrás del modal
+                    flags = flags or WindowManager.LayoutParams.FLAG_DIM_BEHIND
+                    dimAmount = 0.4f
+                }
+                setupProductsCatalogViewListeners()
+
+                // --- Inicializar Share Dialog ---
+                shareDialogView = inflater.inflate(R.layout.product_share_dialog, null)
+                shareDialogParams = createCenteredModalParams()
+                setupShareDialogListeners()
+
+                // --- Inicializar Gallery Modal ---
+                galleryView = inflater.inflate(R.layout.gallery_modal, null)
+                galleryParams = createCenteredModalParams().apply {
+                    // 80% del ancho de la pantalla + oscurecer fondo
+                    width = (resources.displayMetrics.widthPixels * 0.8f).toInt()
+                    flags = flags or WindowManager.LayoutParams.FLAG_DIM_BEHIND
+                    dimAmount = 0.4f
+                }
+                setupGalleryViewListeners()
+
+                // --- Inicializar Cart Modal ---
+                cartView = inflater.inflate(R.layout.cart_modal, null)
+                cartParams = createCenteredModalParams().apply {
+                    // 80% del ancho de la pantalla + oscurecer fondo
+                    width = (resources.displayMetrics.widthPixels * 0.8f).toInt()
+                    flags = flags or WindowManager.LayoutParams.FLAG_DIM_BEHIND
+                    dimAmount = 0.4f
+                }
+                setupCartViewListeners()
+
+                // --- Inicializar Favorites Modal ---
+                favoritesView = inflater.inflate(R.layout.favorites_modal, null)
+                favoritesParams = createCenteredModalParams()
+                setupFavoritesViewListeners()
+
+                loadShortcutsFromPrefs()
+                populateCatalogShortcuts()
+            } catch (e: Exception) {
+                Toast.makeText(this, "Error inicializando modales: ${e.message}", Toast.LENGTH_LONG).show()
+            }
         }
-        setupCatalogViewListeners()
-        
-        // --- Inicializar Products Catalog Modal ---
-        productsCatalogView = inflater.inflate(R.layout.products_catalog_modal, null)
-        productsCatalogParams = createCenteredModalParams()
-        setupProductsCatalogViewListeners()
-        
-        // --- Inicializar Gallery Modal ---
-        galleryView = inflater.inflate(R.layout.gallery_modal, null)
-        galleryParams = createCenteredModalParams()
-        setupGalleryViewListeners()
-
-        // --- Inicializar Cart Modal ---
-        cartView = inflater.inflate(R.layout.cart_modal, null)
-        cartParams = createCenteredModalParams()
-        setupCartViewListeners()
-
-        // --- Inicializar Favorites Modal ---
-        favoritesView = inflater.inflate(R.layout.favorites_modal, null)
-        favoritesParams = createCenteredModalParams()
-        setupFavoritesViewListeners()
-        
-        loadShortcutsFromPrefs()
-        populateCatalogShortcuts()
+    }
+    
+    private fun runOnUiThread(action: () -> Unit) {
+        android.os.Handler(android.os.Looper.getMainLooper()).post(action)
     }
 
     private fun createCenteredModalParams(): WindowManager.LayoutParams {
@@ -211,8 +274,21 @@ class OverlayService : Service() {
     }
 
     private fun showBubble() {
-        if (bubbleView.isAttachedToWindow) return
-        windowManager.addView(bubbleView, bubbleParams)
+        // Asegurar estado
+        currentState = BubbleState.COLLAPSED
+        try {
+            if (bubbleView.isAttachedToWindow) {
+                // Ya agregado: solo actualizar posición/params
+                windowManager.updateViewLayout(bubbleView, bubbleParams)
+                return
+            }
+            windowManager.addView(bubbleView, bubbleParams)
+        } catch (e: IllegalStateException) {
+            // Si ya fue agregado por carrera de eventos, actualiza en vez de agregar
+            try {
+                windowManager.updateViewLayout(bubbleView, bubbleParams)
+            } catch (_: Exception) { /* no-op */ }
+        }
     }
 
     private fun showFan() {
@@ -280,6 +356,12 @@ class OverlayService : Service() {
     }
 
     private fun showProductsCatalog() {
+        // Verificar que las vistas estén inicializadas
+        if (!::productsCatalogView.isInitialized) {
+            Toast.makeText(this, "Cargando catálogo...", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
         hideAllViews()
         currentState = BubbleState.PRODUCTS_CATALOG
         populateProductsCatalog()
@@ -307,6 +389,9 @@ class OverlayService : Service() {
         if (::productsCatalogView.isInitialized && productsCatalogView.isAttachedToWindow) {
             windowManager.removeView(productsCatalogView)
         }
+        if (::shareDialogView.isInitialized && shareDialogView.isAttachedToWindow) {
+            windowManager.removeView(shareDialogView)
+        }
         if (::galleryView.isInitialized && galleryView.isAttachedToWindow) {
             windowManager.removeView(galleryView)
         }
@@ -326,10 +411,7 @@ class OverlayService : Service() {
             showProductsCatalog()
         }
         fanView.findViewById<ImageView>(R.id.btn_gallery).setOnClickListener { 
-            val intent = Intent(this, GalleryActivity::class.java)
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            startActivity(intent)
-            collapseToBubble()
+            showGallery()
         }
         fanView.findViewById<ImageView>(R.id.btn_cart).setOnClickListener { 
             showCart()
@@ -363,6 +445,36 @@ class OverlayService : Service() {
     private fun setupProductsCatalogViewListeners() {
         productsCatalogView.findViewById<ImageView>(R.id.btn_close_products_catalog).setOnClickListener { 
             collapseToBubble()
+        }
+    }
+
+    private fun setupShareDialogListeners() {
+        shareDialogView.findViewById<Button>(R.id.btn_share_intent).setOnClickListener {
+            selectedProduct?.let { product ->
+                shareProductWithIntent(product)
+            }
+        }
+        
+        shareDialogView.findViewById<Button>(R.id.btn_copy_text).setOnClickListener {
+            selectedProduct?.let { product ->
+                copyProductTextOnly(product)
+            }
+        }
+        
+        shareDialogView.findViewById<Button>(R.id.btn_copy_image).setOnClickListener {
+            selectedProduct?.let { product ->
+                copyProductImageOnly(product)
+            }
+        }
+        
+        shareDialogView.findViewById<Button>(R.id.btn_add_to_cart).setOnClickListener {
+            selectedProduct?.let { product ->
+                addProductToCart(product)
+            }
+        }
+        
+        shareDialogView.findViewById<Button>(R.id.btn_cancel_dialog).setOnClickListener {
+            hideShareDialog()
         }
     }
 
@@ -520,12 +632,44 @@ class OverlayService : Service() {
         galleryView.findViewById<ImageView>(R.id.btn_close_gallery).setOnClickListener { 
             showFan()
         }
+        
+        // Configurar RecyclerView del modal de galería (masonry 3 columnas)
+        val recyclerView = galleryView.findViewById<RecyclerView>(R.id.gallery_modal_recycler)
+        recyclerView.layoutManager = StaggeredGridLayoutManager(3, StaggeredGridLayoutManager.VERTICAL)
+        
+        galleryModalAdapter = GalleryModalAdapter(mutableListOf()) { image ->
+            shareImageFromGallery(image)
+        }
+        recyclerView.adapter = galleryModalAdapter
+        
+        // Actualizar galería cuando se muestre
+        updateGalleryModalDisplay()
     }
 
     private fun setupCartViewListeners() {
         cartView.findViewById<ImageView>(R.id.btn_close_cart).setOnClickListener { 
             showFan()
         }
+        
+        cartView.findViewById<Button>(R.id.btn_clear_cart).setOnClickListener {
+            clearCart()
+        }
+        
+        cartView.findViewById<Button>(R.id.btn_share_cart).setOnClickListener {
+            shareCart()
+        }
+        
+        // Configurar RecyclerView del carrito
+        val recyclerView = cartView.findViewById<RecyclerView>(R.id.cart_recycler_view)
+        recyclerView.layoutManager = LinearLayoutManager(this)
+        
+        cartAdapter = CartAdapter(mutableListOf()) { cartItem, newQuantity ->
+            updateCartItemQuantity(cartItem, newQuantity)
+        }
+        recyclerView.adapter = cartAdapter
+        
+        // Actualizar carrito cuando se muestre
+        updateCartDisplay()
     }
 
     private fun setupFavoritesViewListeners() {
@@ -537,12 +681,14 @@ class OverlayService : Service() {
     private fun showGallery() {
         hideAllViews()
         currentState = BubbleState.GALLERY
+        updateGalleryModalDisplay() // Actualizar galería al mostrarlo
         windowManager.addView(galleryView, galleryParams)
     }
 
     private fun showCart() {
         hideAllViews()
         currentState = BubbleState.CART
+        updateCartDisplay() // Actualizar carrito al mostrarlo
         windowManager.addView(cartView, cartParams)
     }
 
@@ -559,6 +705,10 @@ class OverlayService : Service() {
     }
 
     private fun populateProductsCatalog() {
+        if (!::productManager.isInitialized) {
+            return
+        }
+        
         val products = productManager.getAllProducts()
         val gridContainer = productsCatalogView.findViewById<LinearLayout>(R.id.products_grid_container)
         val emptyMessage = productsCatalogView.findViewById<TextView>(R.id.empty_products_message)
@@ -573,15 +723,21 @@ class OverlayService : Service() {
         
         emptyMessage.visibility = View.GONE
         
-        // Crear grid de productos (3 columnas)
-        val columnsCount = 3
-        val imageSize = (80 * resources.displayMetrics.density).toInt() // 80dp
+        // Crear grid de productos (2 columnas) con nombre y precio
+        val columnsCount = 2
         val marginSize = (8 * resources.displayMetrics.density).toInt() // 8dp
+        // Calcular ancho disponible del modal (80% de pantalla ya aplicado en params)
+        val modalWidth = productsCatalogParams.width
+        // Restar padding del ScrollView que contiene al grid
+        val productsScroll = productsCatalogView.findViewById<android.widget.ScrollView>(R.id.products_scroll)
+        val horizontalPadding = (productsScroll?.paddingLeft ?: 0) + (productsScroll?.paddingRight ?: 0)
+        val availableWidth = modalWidth - horizontalPadding
+        // Ancho aproximado de cada columna considerando márgenes laterales del item
+        val itemWidth = ((availableWidth - (marginSize * 4)) / columnsCount)
         
         var currentRow: LinearLayout? = null
         products.forEachIndexed { index, product ->
-            
-            // Crear nueva fila cada 3 productos
+            // Crear nueva fila cada 2 productos
             if (index % columnsCount == 0) {
                 currentRow = LinearLayout(this).apply {
                     layoutParams = LinearLayout.LayoutParams(
@@ -591,45 +747,263 @@ class OverlayService : Service() {
                         setMargins(0, 0, 0, marginSize)
                     }
                     orientation = LinearLayout.HORIZONTAL
-                    gravity = android.view.Gravity.CENTER_HORIZONTAL
+                    gravity = android.view.Gravity.START
                 }
                 gridContainer.addView(currentRow)
             }
-            
-            // Crear vista de producto (imagen clickeable)
-            val productImageView = ImageView(this).apply {
-                layoutParams = LinearLayout.LayoutParams(imageSize, imageSize).apply {
+
+            // Contenedor del item (imagen + textos)
+            val itemContainer = LinearLayout(this).apply {
+                layoutParams = LinearLayout.LayoutParams(itemWidth, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
                     setMargins(marginSize, 0, marginSize, 0)
                 }
-                scaleType = ImageView.ScaleType.CENTER_CROP
-                background = resources.getDrawable(R.drawable.shortcut_bg, null)
+                orientation = LinearLayout.VERTICAL
                 isClickable = true
                 isFocusable = true
-                
-                // Cargar imagen del producto
-                if (product.imageUri.isNotEmpty()) {
-                    try {
-                        val uri = ImageUtils.getImageUri(this@OverlayService, product.imageUri)
-                        if (uri != null) {
-                            setImageURI(uri)
-                        } else {
-                            setImageResource(R.drawable.ic_box)
-                        }
-                    } catch (e: Exception) {
-                        setImageResource(R.drawable.ic_box)
+                setPadding(0, 0, 0, marginSize)
+            }
+
+            // Wrapper con borde 1px y esquinas redondeadas
+            val radiusPx = (8 * resources.displayMetrics.density)
+            val imageWrapper = FrameLayout(this).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    itemWidth
+                )
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = radiusPx
+                    setColor(Color.WHITE)
+                    setStroke(2, Color.parseColor("#DDDDDD"))
+                }
+                // Inset interno igual al grosor del borde para que no se tape
+                setPadding(2, 2, 2, 2)
+                clipToOutline = true
+            }
+
+            // Imagen del producto
+            val productImageView = ImageView(this).apply {
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                // Sin background ni padding; el borde vive en el wrapper
+                setBackgroundColor(Color.TRANSPARENT)
+            }
+
+            // Cargar imagen
+            if (product.imageUri.isNotEmpty()) {
+                try {
+                    val uri = ImageUtils.getImageUri(this@OverlayService, product.imageUri)
+                    if (uri != null) {
+                        productImageView.setImageURI(uri)
+                    } else {
+                        productImageView.setImageResource(R.drawable.ic_box)
+                    }
+                } catch (e: Exception) {
+                    productImageView.setImageResource(R.drawable.ic_box)
+                }
+            } else {
+                productImageView.setImageResource(R.drawable.ic_box)
+            }
+
+            // Nombre del producto
+            val nameView = TextView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    setMargins(0, marginSize / 2, 0, 0)
+                }
+                text = product.name
+                setTextColor(resources.getColor(android.R.color.black, null))
+                textSize = 12f
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                gravity = android.view.Gravity.START
+            }
+
+            // Precio del producto
+            val priceText = if (product.price > 0) {
+                "${'$'}" + String.format("%.2f", product.price)
+            } else {
+                "Precio no especificado"
+            }
+            val priceView = TextView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    setMargins(0, marginSize / 4, 0, 0)
+                }
+                text = priceText
+                setTextColor(resources.getColor(android.R.color.darker_gray, null))
+                textSize = 11f
+                gravity = android.view.Gravity.START
+            }
+
+            // Click en todo el item
+            itemContainer.setOnClickListener { showShareDialog(product) }
+
+            // Armar vista
+            imageWrapper.addView(productImageView)
+            itemContainer.addView(imageWrapper)
+            itemContainer.addView(nameView)
+            itemContainer.addView(priceView)
+            currentRow?.addView(itemContainer)
+        }
+
+        // Ajustar altura del modal dinámicamente
+        val rows = ((products.size + (columnsCount - 1)) / columnsCount)
+        val maxRowsNoScroll = 4
+        val density = resources.displayMetrics.density
+        val textExtraPx = (34 * density).toInt() // espacio estimado para nombre y precio + márgenes
+        val rowHeight = itemWidth + textExtraPx + marginSize // alto de una fila
+
+        // Medir header si es posible
+        val headerView = productsCatalogView.findViewById<LinearLayout>(R.id.products_header)
+        if (headerView.measuredHeight == 0) {
+            val widthSpec = View.MeasureSpec.makeMeasureSpec(productsCatalogParams.width, View.MeasureSpec.EXACTLY)
+            val heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+            headerView.measure(widthSpec, heightSpec)
+        }
+        val headerHeight = if (headerView.measuredHeight > 0) headerView.measuredHeight else (48 * density).toInt()
+        val verticalPadding = productsCatalogView.paddingTop + productsCatalogView.paddingBottom
+
+        val desiredRows = rows.coerceAtMost(maxRowsNoScroll)
+        val contentHeightNoScroll = desiredRows * rowHeight
+        val totalDesiredHeight = headerHeight + contentHeightNoScroll + verticalPadding + (16 * density).toInt() // margen inferior del header
+
+        val screenHeight = resources.displayMetrics.heightPixels
+        val maxModalHeight = (screenHeight * 0.9f).toInt()
+
+        // Configurar scroll y alturas
+        val scrollView = productsCatalogView.findViewById<android.widget.ScrollView>(R.id.products_scroll)
+        if (rows <= maxRowsNoScroll) {
+            // Sin scroll para 8 o menos productos
+            scrollView.isVerticalScrollBarEnabled = false
+            scrollView.overScrollMode = View.OVER_SCROLL_NEVER
+            scrollView.layoutParams = scrollView.layoutParams.apply {
+                height = LinearLayout.LayoutParams.WRAP_CONTENT
+            }
+            productsCatalogParams.height = totalDesiredHeight.coerceAtMost(maxModalHeight)
+        } else {
+            // Con scroll para 9 o más
+            scrollView.isVerticalScrollBarEnabled = true
+            productsCatalogParams.height = maxModalHeight
+        }
+    }
+    
+    private fun showShareDialog(product: Product) {
+        selectedProduct = product
+        hideAllViews()
+        currentState = BubbleState.SHARE_DIALOG
+        
+        // Llenar información del producto en el diálogo
+        populateShareDialog(product)
+        
+        windowManager.addView(shareDialogView, shareDialogParams)
+    }
+    
+    private fun hideShareDialog() {
+        if (::shareDialogView.isInitialized && shareDialogView.isAttachedToWindow) {
+            windowManager.removeView(shareDialogView)
+        }
+        selectedProduct = null
+        showProductsCatalog()
+    }
+    
+    private fun populateShareDialog(product: Product) {
+        // Llenar imagen
+        val dialogImage = shareDialogView.findViewById<ImageView>(R.id.dialog_product_image)
+        if (product.imageUri.isNotEmpty()) {
+            try {
+                val uri = ImageUtils.getImageUri(this, product.imageUri)
+                if (uri != null) {
+                    dialogImage.setImageURI(uri)
+                    dialogImage.scaleType = ImageView.ScaleType.CENTER_CROP
+                } else {
+                    dialogImage.setImageResource(R.drawable.ic_box)
+                    dialogImage.scaleType = ImageView.ScaleType.CENTER
+                }
+            } catch (e: Exception) {
+                dialogImage.setImageResource(R.drawable.ic_box)
+                dialogImage.scaleType = ImageView.ScaleType.CENTER
+            }
+        } else {
+            dialogImage.setImageResource(R.drawable.ic_box)
+            dialogImage.scaleType = ImageView.ScaleType.CENTER
+        }
+        
+        // Llenar textos
+        shareDialogView.findViewById<TextView>(R.id.dialog_product_name).text = product.name
+        shareDialogView.findViewById<TextView>(R.id.dialog_product_price).text = 
+            if (product.price > 0) "\$${String.format("%.2f", product.price)}" else "Precio no especificado"
+    }
+    
+    private fun shareProductWithIntent(product: Product) {
+        // Crear texto completo del producto
+        val productText = buildString {
+            append("🛍️ ${product.name}")
+            if (product.description.isNotEmpty()) {
+                append("\n📝 ${product.description}")
+            }
+            if (product.price > 0) {
+                append("\n💰 \$${String.format("%.2f", product.price)}")
+            }
+            if (product.link.isNotEmpty()) {
+                append("\n🔗 ${product.link}")
+            }
+        }
+        
+        try {
+            val shareIntent = Intent(Intent.ACTION_SEND)
+            
+            // Si tiene imagen, compartir imagen con texto
+            if (product.imageUri.isNotEmpty()) {
+                val imageFile = File(product.imageUri)
+                if (imageFile.exists()) {
+                    val imageUri = FileProvider.getUriForFile(
+                        this,
+                        "com.livecopilot.fileprovider",
+                        imageFile
+                    )
+                    shareIntent.apply {
+                        type = "image/*"
+                        putExtra(Intent.EXTRA_STREAM, imageUri)
+                        putExtra(Intent.EXTRA_TEXT, productText)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
                 } else {
-                    setImageResource(R.drawable.ic_box)
+                    // Si no existe la imagen, solo texto
+                    shareIntent.apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TEXT, productText)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
                 }
-                
-                // Click listener para copiar y pegar producto
-                setOnClickListener {
-                    copyProductToClipboard(product)
+            } else {
+                // Solo texto
+                shareIntent.apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, productText)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
             }
             
-            currentRow?.addView(productImageView)
+            val chooser = Intent.createChooser(shareIntent, "Compartir producto:")
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(chooser)
+            
+        } catch (e: Exception) {
+            // Fallback: copiar al portapapeles
+            copyTextToClipboard(productText)
+            Toast.makeText(this, "Producto copiado al portapapeles", Toast.LENGTH_SHORT).show()
         }
+        
+        collapseToBubble()
     }
     
     private fun copyProductToClipboard(product: Product) {
@@ -647,20 +1021,91 @@ class OverlayService : Service() {
             }
         }
         
-        // Estrategia simplificada: siempre copiar texto al portapapeles y abrir WhatsApp con imagen
+        // Copiar texto al portapapeles
+        if (product.imageUri.isNotEmpty()) {
+            // Copiar texto e imagen al portapapeles
+            copyTextAndImageToClipboard(productText, product.imageUri)
+        } else {
+            // Solo texto
+            copyTextToClipboard(productText)
+        }
+        
+        // Usar servicio de accesibilidad si está disponible para pegar automáticamente
+        if (isAccessibilityServiceEnabled()) {
+            val intent = Intent(this, AutoPasteAccessibilityService::class.java)
+            intent.action = AutoPasteAccessibilityService.ACTION_PASTE_TEXT
+            intent.putExtra(AutoPasteAccessibilityService.EXTRA_TEXT, productText)
+            startService(intent)
+        }
+        
+        // Mostrar instrucciones sobre la imagen
+        val message = if (product.imageUri.isNotEmpty()) {
+            "Texto copiado. Para la imagen: mantén presionado en el campo → Pegar imagen"
+        } else {
+            "Producto copiado al portapapeles"
+        }
+        
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        collapseToBubble()
+    }
+    
+    private fun copyProductTextOnly(product: Product) {
+        // Crear texto completo del producto
+        val productText = buildString {
+            append("🛍️ ${product.name}")
+            if (product.description.isNotEmpty()) {
+                append("\n📝 ${product.description}")
+            }
+            if (product.price > 0) {
+                append("\n💰 \$${String.format("%.2f", product.price)}")
+            }
+            if (product.link.isNotEmpty()) {
+                append("\n🔗 ${product.link}")
+            }
+        }
+        
+        // Solo copiar texto al portapapeles
         copyTextToClipboard(productText)
         
-        if (product.imageUri.isNotEmpty()) {
-            // Abrir WhatsApp con la imagen
-            openWhatsAppWithImage(product.imageUri, productText)
+        // Usar servicio de accesibilidad si está disponible para pegar automáticamente
+        if (isAccessibilityServiceEnabled()) {
+            val intent = Intent(this, AutoPasteAccessibilityService::class.java)
+            intent.action = AutoPasteAccessibilityService.ACTION_PASTE_TEXT
+            intent.putExtra(AutoPasteAccessibilityService.EXTRA_TEXT, productText)
+            startService(intent)
+            Toast.makeText(this, "Texto pegado automáticamente", Toast.LENGTH_SHORT).show()
         } else {
-            // Solo texto, usar servicio de accesibilidad si está disponible
-            if (isAccessibilityServiceEnabled()) {
-                val intent = Intent(this, AutoPasteAccessibilityService::class.java)
-                intent.action = AutoPasteAccessibilityService.ACTION_PASTE_TEXT
-                intent.putExtra(AutoPasteAccessibilityService.EXTRA_TEXT, productText)
-                startService(intent)
+            Toast.makeText(this, "Texto copiado al portapapeles", Toast.LENGTH_SHORT).show()
+        }
+        
+        collapseToBubble()
+    }
+    
+    private fun copyProductImageOnly(product: Product) {
+        if (product.imageUri.isEmpty()) {
+            Toast.makeText(this, "Este producto no tiene imagen", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        try {
+            val imageFile = File(product.imageUri)
+            if (imageFile.exists()) {
+                val imageUri = FileProvider.getUriForFile(
+                    this,
+                    "com.livecopilot.fileprovider",
+                    imageFile
+                )
+                
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clip = ClipData.newUri(contentResolver, "Imagen del producto", imageUri)
+                clipboard.setPrimaryClip(clip)
+                
+                Toast.makeText(this, "Imagen copiada - mantén presionado en el campo → Pegar", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(this, "Imagen no encontrada", Toast.LENGTH_SHORT).show()
             }
+        } catch (e: Exception) {
+            Toast.makeText(this, "Error al copiar imagen", Toast.LENGTH_SHORT).show()
         }
         
         collapseToBubble()
@@ -672,57 +1117,202 @@ class OverlayService : Service() {
         clipboard.setPrimaryClip(clip)
     }
     
-    private fun openWhatsAppWithImage(imagePath: String, text: String) {
+    private fun copyTextAndImageToClipboard(text: String, imagePath: String) {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        
         try {
-            // Crear URI segura usando FileProvider
             val imageFile = File(imagePath)
-            if (!imageFile.exists()) {
-                // Si no existe el archivo, solo pegar texto
+            if (imageFile.exists()) {
+                val imageUri = FileProvider.getUriForFile(
+                    this,
+                    "com.livecopilot.fileprovider",
+                    imageFile
+                )
+                
+                // Crear ClipData con texto e imagen
+                val clip = ClipData(
+                    "LiveCopilot Producto",
+                    arrayOf("text/plain", "image/*"),
+                    ClipData.Item(text)
+                )
+                clip.addItem(ClipData.Item(imageUri))
+                
+                clipboard.setPrimaryClip(clip)
+            } else {
+                // Si no existe la imagen, solo copiar texto
+                copyTextToClipboard(text)
+            }
+        } catch (e: Exception) {
+            // Si falla, al menos copiar el texto
+            copyTextToClipboard(text)
+        }
+    }
+    
+    
+    // Cart functionality methods
+    private fun addProductToCart(product: Product) {
+        if (::cartManager.isInitialized) {
+            val success = cartManager.addToCart(product)
+            if (success) {
+                Toast.makeText(this, "Producto agregado al carrito", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "Error al agregar producto", Toast.LENGTH_SHORT).show()
+            }
+        }
+        hideShareDialog()
+    }
+    
+    private fun updateCartItemQuantity(cartItem: com.livecopilot.data.CartItem, newQuantity: Int) {
+        if (::cartManager.isInitialized) {
+            if (newQuantity <= 0) {
+                cartManager.removeFromCart(cartItem.product.id)
+            } else {
+                cartManager.updateQuantity(cartItem.product.id, newQuantity)
+            }
+            updateCartDisplay()
+        }
+    }
+    
+    private fun clearCart() {
+        if (::cartManager.isInitialized) {
+            cartManager.clearCart()
+            updateCartDisplay()
+            Toast.makeText(this, "Carrito vaciado", Toast.LENGTH_SHORT).show()
+        }
+    }
+    
+    private fun shareCart() {
+        if (::cartManager.isInitialized) {
+            val cartItems = cartManager.getCartItems()
+            if (cartItems.isEmpty()) {
+                Toast.makeText(this, "El carrito está vacío", Toast.LENGTH_SHORT).show()
                 return
             }
             
-            val imageUri = FileProvider.getUriForFile(
-                this,
-                "com.livecopilot.fileprovider",
-                imageFile
-            )
+            // Ocultar el carrito antes de mostrar el diálogo de compartir
+            hideAllViews()
+            collapseToBubble()
             
-            // Intent para compartir imagen con texto
-            val shareIntent = Intent().apply {
-                action = Intent.ACTION_SEND
-                type = "image/*"
-                putExtra(Intent.EXTRA_STREAM, imageUri)
-                putExtra(Intent.EXTRA_TEXT, text)
+            val cartText = generateCartText(cartItems)
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, cartText)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             
-            // Intentar abrir WhatsApp directamente
-            val whatsappPackages = listOf("com.whatsapp", "com.whatsapp.w4b")
-            var opened = false
-            
-            for (packageName in whatsappPackages) {
-                try {
-                    shareIntent.setPackage(packageName)
-                    startActivity(shareIntent)
-                    opened = true
-                    break
-                } catch (e: Exception) {
-                    // Continuar con el siguiente package
-                }
-            }
-            
-            if (!opened) {
-                // Si no se pudo abrir WhatsApp, usar selector
-                shareIntent.setPackage(null)
-                val chooser = Intent.createChooser(shareIntent, "Enviar producto por:")
+            try {
+                val chooser = Intent.createChooser(shareIntent, "Compartir carrito:")
                 chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 startActivity(chooser)
+            } catch (e: Exception) {
+                copyTextToClipboard(cartText)
+                Toast.makeText(this, "Carrito copiado al portapapeles", Toast.LENGTH_SHORT).show()
             }
-            
-        } catch (e: Exception) {
-            // Si falla todo, el texto ya está en portapapeles
-            e.printStackTrace()
         }
+    }
+    
+    private fun generateCartText(cartItems: List<com.livecopilot.data.CartItem>): String {
+        val builder = StringBuilder()
+        builder.append("🛒 MI CARRITO DE COMPRAS\n")
+        builder.append("━━━━━━━━━━━━━━━━━━━━━━━\n\n")
+        
+        var total = 0.0
+        cartItems.forEach { item ->
+            val subtotal = item.product.price * item.quantity
+            total += subtotal
+            
+            builder.append("• ${item.product.name}\n")
+            builder.append("  Cantidad: ${item.quantity}\n")
+            builder.append("  Precio: $%.2f\n".format(item.product.price))
+            builder.append("  Subtotal: $%.2f\n\n".format(subtotal))
+        }
+        
+        builder.append("━━━━━━━━━━━━━━━━━━━━━━━\n")
+        builder.append("💰 TOTAL: $%.2f\n\n".format(total))
+        builder.append("📱 Enviado con LiveCopilot")
+        
+        return builder.toString()
+    }
+    
+    private fun updateCartDisplay() {
+        if (::cartManager.isInitialized && ::cartAdapter.isInitialized) {
+            runOnUiThread {
+                val cartItems = cartManager.getCartItems()
+                cartAdapter.updateItems(cartItems)
+                
+                // Actualizar total
+                val total = cartItems.sumOf { it.product.price * it.quantity }
+                val totalText = cartView.findViewById<TextView>(R.id.cart_total)
+                totalText.text = "$%.2f".format(total)
+                
+                // Mostrar/ocultar mensaje de carrito vacío
+                val emptyMessage = cartView.findViewById<TextView>(R.id.empty_cart_message)
+                val recyclerView = cartView.findViewById<RecyclerView>(R.id.cart_recycler_view)
+                
+                if (cartItems.isEmpty()) {
+                    emptyMessage.visibility = View.VISIBLE
+                    recyclerView.visibility = View.GONE
+                } else {
+                    emptyMessage.visibility = View.GONE
+                    recyclerView.visibility = View.VISIBLE
+                }
+            }
+        }
+    }
+    
+    // Gallery modal functionality methods
+    private fun updateGalleryModalDisplay() {
+        if (::imageManager.isInitialized && ::galleryModalAdapter.isInitialized) {
+            runOnUiThread {
+                val images = imageManager.getAllImages()
+                galleryModalAdapter.updateImages(images)
+                
+                // Mostrar/ocultar mensaje de galería vacía
+                val emptyMessage = galleryView.findViewById<TextView>(R.id.empty_gallery_modal_message)
+                val recyclerView = galleryView.findViewById<RecyclerView>(R.id.gallery_modal_recycler)
+                
+                if (images.isEmpty()) {
+                    emptyMessage.visibility = View.VISIBLE
+                    recyclerView.visibility = View.GONE
+                } else {
+                    emptyMessage.visibility = View.GONE
+                    recyclerView.visibility = View.VISIBLE
+                }
+            }
+        }
+    }
+    
+    private fun shareImageFromGallery(image: GalleryImage) {
+        try {
+            val imageFile = File(image.imagePath)
+            if (imageFile.exists()) {
+                val imageUri = FileProvider.getUriForFile(
+                    this,
+                    "com.livecopilot.fileprovider",
+                    imageFile
+                )
+                
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "image/*"
+                    putExtra(Intent.EXTRA_STREAM, imageUri)
+                    if (image.description.isNotEmpty()) {
+                        putExtra(Intent.EXTRA_TEXT, image.description)
+                    }
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                
+                val chooser = Intent.createChooser(shareIntent, "Compartir imagen:")
+                chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(chooser)
+                
+            } else {
+                Toast.makeText(this, "Imagen no encontrada", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            Toast.makeText(this, "Error al compartir imagen", Toast.LENGTH_SHORT).show()
+        }
+        
+        collapseToBubble()
     }
 }

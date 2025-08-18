@@ -72,7 +72,7 @@
                     android:layout_height="100dp"
                     android:layout_columnWeight="1"
                     android:layout_margin="8dp"
-                    android:background="@drawable/gray_circle_bg"
+                    android:background="@drawable/main_button_catalog_bg"
                     android:clickable="true"
                     android:focusable="true">
 
@@ -87,7 +87,8 @@
                             android:layout_width="32dp"
                             android:layout_height="32dp"
                             android:src="@drawable/ic_box"
-                            android:layout_marginBottom="8dp" />
+                            android:layout_marginBottom="8dp"
+                            app:tint="@android:color/white" />
 
                         <TextView
                             android:layout_width="wrap_content"
@@ -107,7 +108,7 @@
                     android:layout_height="100dp"
                     android:layout_columnWeight="1"
                     android:layout_margin="8dp"
-                    android:background="@drawable/gray_circle_bg"
+                    android:background="@drawable/main_button_gallery_bg"
                     android:clickable="true"
                     android:focusable="true">
 
@@ -122,7 +123,8 @@
                             android:layout_width="32dp"
                             android:layout_height="32dp"
                             android:src="@drawable/ic_image"
-                            android:layout_marginBottom="8dp" />
+                            android:layout_marginBottom="8dp"
+                            app:tint="@android:color/white" />
 
                         <TextView
                             android:layout_width="wrap_content"
@@ -142,7 +144,7 @@
                     android:layout_height="100dp"
                     android:layout_columnWeight="1"
                     android:layout_margin="8dp"
-                    android:background="@drawable/gray_circle_bg"
+                    android:background="@drawable/main_button_favorites_bg"
                     android:clickable="true"
                     android:focusable="true">
 
@@ -157,7 +159,8 @@
                             android:layout_width="32dp"
                             android:layout_height="32dp"
                             android:src="@drawable/ic_favorite"
-                            android:layout_marginBottom="8dp" />
+                            android:layout_marginBottom="8dp"
+                            app:tint="@android:color/white" />
 
                         <TextView
                             android:layout_width="wrap_content"
@@ -177,7 +180,7 @@
                     android:layout_height="100dp"
                     android:layout_columnWeight="1"
                     android:layout_margin="8dp"
-                    android:background="@drawable/gray_circle_bg"
+                    android:background="@drawable/main_button_settings_bg"
                     android:clickable="true"
                     android:focusable="true">
 
@@ -192,7 +195,8 @@
                             android:layout_width="32dp"
                             android:layout_height="32dp"
                             android:src="@drawable/ic_settings"
-                            android:layout_marginBottom="8dp" />
+                            android:layout_marginBottom="8dp"
+                            app:tint="@android:color/white" />
 
                         <TextView
                             android:layout_width="wrap_content"

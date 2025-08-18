@@ -53,7 +53,8 @@ class MainActivity : AppCompatActivity() {
 
         // Botón Galería
         findViewById<FrameLayout>(R.id.btn_gallery).setOnClickListener {
-            Toast.makeText(this, "Galería - Próximamente", Toast.LENGTH_SHORT).show()
+            val intent = Intent(this, GalleryActivity::class.java)
+            startActivity(intent)
         }
 
         // Botón Favoritos
@@ -124,6 +125,12 @@ class MainActivity : AppCompatActivity() {
         startForegroundService(intent)
         Toast.makeText(this, "LiveCopilot iniciado", Toast.LENGTH_SHORT).show()
         
+        // Mostrar explícitamente la burbuja al iniciar el servicio
+        val showIntent = Intent(this, OverlayService::class.java).apply {
+            action = OverlayService.ACTION_SHOW_BUBBLE
+        }
+        startService(showIntent)
+
         // Minimizar la ventana principal
         moveTaskToBack(true)
     }
