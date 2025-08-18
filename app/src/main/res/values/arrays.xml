@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="favorite_types">
+        <item>Enlace</item>
+        <item>PDF</item>
+        <item>Imagen</item>
+        <item>Texto</item>
+    </string-array>
+</resources>
