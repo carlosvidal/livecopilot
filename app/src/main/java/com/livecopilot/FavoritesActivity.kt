@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.widget.*
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -21,6 +22,15 @@ class FavoritesActivity : AppCompatActivity() {
     private lateinit var favoritesManager: FavoritesManager
     private lateinit var recycler: RecyclerView
     private lateinit var adapter: FavoritesAdapter
+    private var contentInputRef: EditText? = null
+    private val pickDocument = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        uri ?: return@registerForActivityResult
+        try {
+            // Persistir permiso de lectura
+            contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        } catch (_: Exception) { }
+        contentInputRef?.setText(uri.toString())
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -52,6 +62,35 @@ class FavoritesActivity : AppCompatActivity() {
         val typeSpinner = view.findViewById<Spinner>(R.id.input_type)
         val nameInput = view.findViewById<EditText>(R.id.input_name)
         val contentInput = view.findViewById<EditText>(R.id.input_content)
+        val pickButton = view.findViewById<Button>(R.id.btn_pick_file)
+        contentInputRef = contentInput
+
+        fun updatePickerVisibility(position: Int) {
+            // 1 = PDF, 2 = Imagen según arrays.xml mapping en spinnerSelectionToType
+            pickButton.visibility = if (position == 1 || position == 2) Button.VISIBLE else Button.GONE
+        }
+
+        updatePickerVisibility(typeSpinner.selectedItemPosition)
+        typeSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: android.view.View?, position: Int, id: Long) {
+                updatePickerVisibility(position)
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+
+        pickButton.setOnClickListener {
+            val idx = typeSpinner.selectedItemPosition
+            val mime = when (idx) {
+                1 -> "application/pdf" // PDF
+                2 -> "image/*"        // Imagen
+                else -> "*/*"
+            }
+            try {
+                pickDocument.launch(arrayOf(mime))
+            } catch (_: Exception) {
+                Toast.makeText(this, "No se pudo abrir el selector", Toast.LENGTH_SHORT).show()
+            }
+        }
 
         AlertDialog.Builder(this)
             .setTitle("Nuevo favorito")
@@ -69,6 +108,8 @@ class FavoritesActivity : AppCompatActivity() {
                 loadFavorites()
             }
             .show()
+        // Evitar fugas de referencia
+        (view.parent as? AlertDialog)?.setOnDismissListener { contentInputRef = null }
     }
 
     private fun spinnerSelectionToType(index: Int): FavoriteType = when (index) {

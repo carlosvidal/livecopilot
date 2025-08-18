@@ -36,8 +36,14 @@ class FavoritesAdapter(
             FavoriteType.IMAGE -> "Imagen"
             FavoriteType.TEXT -> "Texto"
         }
-        // Icono: usar ic_favorite para todos (seguro). Si quieres, personalizamos luego.
-        holder.icon.setImageResource(R.drawable.ic_favorite)
+        // Icono por tipo (usando drawables existentes)
+        val iconRes = when (fav.type) {
+            FavoriteType.LINK -> R.drawable.ic_shortcut
+            FavoriteType.PDF -> R.drawable.ic_box
+            FavoriteType.IMAGE -> R.drawable.ic_image
+            FavoriteType.TEXT -> R.drawable.ic_save
+        }
+        holder.icon.setImageResource(iconRes)
 
         holder.itemView.setOnClickListener { onClick(fav) }
         holder.itemView.setOnLongClickListener {

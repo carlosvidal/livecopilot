@@ -28,4 +28,12 @@
         android:gravity="top"
         android:inputType="textMultiLine" />
 
+    <Button
+        android:id="@+id/btn_pick_file"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="Seleccionar archivo"
+        android:visibility="gone" />
+
 </LinearLayout>
