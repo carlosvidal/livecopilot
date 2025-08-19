@@ -16,6 +16,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.livecopilot.data.Favorite
 import com.livecopilot.data.FavoriteType
 import com.livecopilot.data.FavoritesManager
+import android.util.Patterns
 
 class FavoritesActivity : AppCompatActivity() {
 
@@ -92,24 +93,42 @@ class FavoritesActivity : AppCompatActivity() {
             }
         }
 
-        AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this)
             .setTitle("Nuevo favorito")
             .setView(view)
             .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Guardar") { _, _ ->
-                val type = spinnerSelectionToType(typeSpinner.selectedItemPosition)
+            .setPositiveButton("Guardar", null)
+            .create()
+
+        dialog.setOnShowListener {
+            val btnSave = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            btnSave.setOnClickListener {
+                nameInput.error = null
+                contentInput.error = null
+
+                val typeIndex = typeSpinner.selectedItemPosition
                 val name = nameInput.text?.toString()?.trim().orEmpty()
                 val content = contentInput.text?.toString()?.trim().orEmpty()
-                if (name.isEmpty() || content.isEmpty()) {
-                    Toast.makeText(this, "Completa nombre y contenido", Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
+
+                val errorMsg = validateFavoriteInputs(typeIndex, name, content, excludeId = null)
+                if (errorMsg != null) {
+                    // Marcar errores específicos
+                    if (name.isEmpty()) nameInput.error = "Requerido"
+                    if (content.isEmpty()) contentInput.error = "Requerido"
+                    else contentInput.error = errorMsg
+                    Toast.makeText(this, errorMsg, Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
                 }
+
+                val type = spinnerSelectionToType(typeIndex)
                 favoritesManager.add(type, name, content)
                 loadFavorites()
+                dialog.dismiss()
             }
-            .show()
-        // Evitar fugas de referencia
-        (view.parent as? AlertDialog)?.setOnDismissListener { contentInputRef = null }
+        }
+
+        dialog.setOnDismissListener { contentInputRef = null }
+        dialog.show()
     }
 
     private fun spinnerSelectionToType(index: Int): FavoriteType = when (index) {
@@ -203,20 +222,76 @@ class FavoritesActivity : AppCompatActivity() {
             .setTitle("Editar favorito")
             .setView(view)
             .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Guardar") { _, _ ->
-                val type = spinnerSelectionToType(typeSpinner.selectedItemPosition)
+            .setPositiveButton("Guardar", null)
+            .create()
+        dialog.setOnShowListener {
+            val btnSave = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            btnSave.setOnClickListener {
+                nameInput.error = null
+                contentInput.error = null
+
+                val typeIndex = typeSpinner.selectedItemPosition
                 val name = nameInput.text?.toString()?.trim().orEmpty()
                 val content = contentInput.text?.toString()?.trim().orEmpty()
-                if (name.isEmpty() || content.isEmpty()) {
-                    Toast.makeText(this, "Completa nombre y contenido", Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
+
+                val errorMsg = validateFavoriteInputs(typeIndex, name, content, excludeId = fav.id)
+                if (errorMsg != null) {
+                    if (name.isEmpty()) nameInput.error = "Requerido"
+                    if (content.isEmpty()) contentInput.error = "Requerido"
+                    else contentInput.error = errorMsg
+                    Toast.makeText(this, errorMsg, Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
                 }
+
+                val type = spinnerSelectionToType(typeIndex)
                 favoritesManager.update(fav.copy(type = type, name = name, content = content))
                 loadFavorites()
+                dialog.dismiss()
             }
-            .create()
+        }
         dialog.setOnDismissListener { contentInputRef = null }
         dialog.show()
+    }
+
+    private fun validateFavoriteInputs(typeIndex: Int, name: String, content: String, excludeId: String? = null): String? {
+        if (name.isBlank() || content.isBlank()) return "Completa nombre y contenido"
+
+        // Duplicados por nombre (case-insensitive)
+        val duplicated = favoritesManager.getAll().any { it.name.equals(name, ignoreCase = true) && it.id != excludeId }
+        if (duplicated) return "Ya existe un favorito con ese nombre"
+
+        return when (typeIndex) {
+            0 -> { // LINK
+                val isWeb = Patterns.WEB_URL.matcher(content).matches()
+                val uri = runCatching { Uri.parse(content) }.getOrNull()
+                val schemeOk = uri?.scheme == "http" || uri?.scheme == "https"
+                if (!isWeb || !schemeOk) "Ingresa un enlace válido (http/https)" else null
+            }
+            1, // PDF
+            2 -> { // IMAGE
+                val uri = runCatching { Uri.parse(content) }.getOrNull()
+                val scheme = uri?.scheme
+                val allowed = scheme == "content" || scheme == "file" || scheme == "http" || scheme == "https"
+                if (!allowed) {
+                    "Ingresa una URI válida (content://, file:// o http/https)"
+                } else {
+                    // Validación MIME para content:// cuando sea posible
+                    if (scheme == "content" && uri != null) {
+                        val mime = runCatching { contentResolver.getType(uri) }.getOrNull()
+                        if (mime != null) {
+                            val ok = when (typeIndex) {
+                                1 -> mime == "application/pdf"
+                                2 -> mime.startsWith("image/")
+                                else -> true
+                            }
+                            if (!ok) return "El contenido no coincide con el tipo seleccionado"
+                        }
+                    }
+                    null
+                }
+            }
+            else -> null // TEXT
+        }
     }
 
     private fun openLink(url: String) {

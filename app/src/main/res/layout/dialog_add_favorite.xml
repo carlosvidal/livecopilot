@@ -5,28 +5,75 @@
     android:orientation="vertical"
     android:padding="16dp">
 
+    <TextView
+        android:id="@+id/label_type"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Tipo"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:labelFor="@id/input_type" />
+
     <Spinner
         android:id="@+id/input_type"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:entries="@array/favorite_types" />
+        android:entries="@array/favorite_types"
+        android:prompt="@string/prompt_favorite_type"
+        android:contentDescription="Selector de tipo de favorito" />
+
+    <TextView
+        android:id="@+id/label_name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="Nombre"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:labelFor="@id/input_name" />
 
     <EditText
         android:id="@+id/input_name"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:hint="Nombre"
+        android:inputType="textCapSentences|textPersonName"
+        android:imeOptions="actionNext"
+        android:maxLength="60"
+        android:autofillHints="name"
+        android:importantForAutofill="yes"
+        android:drawableStart="@android:drawable/ic_menu_edit"
+        android:drawablePadding="8dp"
+        android:drawableTint="?attr/colorControlNormal"
+        android:nextFocusDown="@id/input_content" />
+
+    <TextView
+        android:id="@+id/label_content"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
-        android:hint="Nombre" />
+        android:text="Contenido"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:labelFor="@id/input_content" />
 
     <EditText
         android:id="@+id/input_content"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="6dp"
         android:hint="Contenido (URL, ruta de archivo o texto)"
-        android:minLines="2"
+        android:minLines="3"
+        android:maxLines="6"
+        android:scrollbars="vertical"
         android:gravity="top"
-        android:inputType="textMultiLine" />
+        android:inputType="textUri|textMultiLine|textNoSuggestions"
+        android:imeOptions="actionDone"
+        android:maxLength="5000"
+        android:autofillHints="username,postalAddress,postalAddressExtended"
+        android:importantForAutofill="yes"
+        android:drawableStart="@android:drawable/ic_menu_edit"
+        android:drawablePadding="8dp"
+        android:drawableTint="?attr/colorControlNormal"
+        android:nextFocusUp="@id/input_name" />
 
     <Button
         android:id="@+id/btn_pick_file"
@@ -34,6 +81,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
         android:text="Seleccionar archivo"
+        android:contentDescription="Abrir selector de archivos"
         android:visibility="gone" />
 
 </LinearLayout>
