@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.view.View
@@ -78,9 +79,14 @@ class GalleryActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_gallery)
         
-        setSupportActionBar(findViewById(R.id.toolbar))
+        val toolbar = findViewById<androidx.appcompat.widget.Toolbar>(R.id.toolbar)
+        setSupportActionBar(toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         supportActionBar?.title = "Galería"
+        // Color de encabezado igual al botón de Galería
+        toolbar.setBackgroundColor(ContextCompat.getColor(this, R.color.gallery_primary))
+        toolbar.setTitleTextColor(Color.WHITE)
+        toolbar.navigationIcon?.setTint(Color.WHITE)
         
         imageManager = ImageManager(this)
         setupViews()

@@ -5,12 +5,14 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.livecopilot.data.Favorite
@@ -37,9 +39,14 @@ class FavoritesActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_favorites)
 
-        setSupportActionBar(findViewById(R.id.toolbar))
+        val toolbar = findViewById<androidx.appcompat.widget.Toolbar>(R.id.toolbar)
+        setSupportActionBar(toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         supportActionBar?.title = "Favoritos"
+        // Color de encabezado igual al botón de Favoritos
+        toolbar.setBackgroundColor(ContextCompat.getColor(this, R.color.favorites_primary))
+        toolbar.setTitleTextColor(Color.WHITE)
+        toolbar.navigationIcon?.setTint(Color.WHITE)
 
         favoritesManager = FavoritesManager(this)
 

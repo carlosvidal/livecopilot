@@ -2,11 +2,13 @@ package com.livecopilot
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import android.view.View
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.livecopilot.data.Product
@@ -15,7 +17,7 @@ import com.livecopilot.data.ProductManager
 class CatalogActivity : AppCompatActivity() {
     
     private lateinit var recyclerView: RecyclerView
-    private lateinit var adapter: ProductAdapter
+    private lateinit var adapter: ProductShortcutAdapter
     private lateinit var fabAddProduct: FloatingActionButton
     private lateinit var emptyView: TextView
     private lateinit var productManager: ProductManager
@@ -25,9 +27,14 @@ class CatalogActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_catalog)
         
-        setSupportActionBar(findViewById(R.id.toolbar))
+        val toolbar = findViewById<androidx.appcompat.widget.Toolbar>(R.id.toolbar)
+        setSupportActionBar(toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         supportActionBar?.title = "Catálogo"
+        // Color de encabezado igual al botón de Catálogo
+        toolbar.setBackgroundColor(ContextCompat.getColor(this, R.color.catalog_primary))
+        toolbar.setTitleTextColor(Color.WHITE)
+        toolbar.navigationIcon?.setTint(Color.WHITE)
         
         productManager = ProductManager(this)
         setupViews()
@@ -39,12 +46,12 @@ class CatalogActivity : AppCompatActivity() {
         fabAddProduct = findViewById(R.id.fab_add_product)
         emptyView = findViewById(R.id.empty_view)
         
-        adapter = ProductAdapter(products) { product ->
+        adapter = ProductShortcutAdapter(products) { product ->
             // Click en producto
             openProductDetail(product)
         }
         
-        recyclerView.layoutManager = LinearLayoutManager(this)
+        recyclerView.layoutManager = GridLayoutManager(this, 3)
         recyclerView.adapter = adapter
         
         fabAddProduct.setOnClickListener {
