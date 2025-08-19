@@ -20,6 +20,13 @@
         android:paddingTop="12dp"
         android:paddingBottom="12dp">
 
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_box"
+            android:tint="@android:color/white"
+            android:layout_marginEnd="8dp" />
+
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"

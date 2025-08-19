@@ -13,20 +13,27 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:background="@drawable/main_button_catalog_bg_top"
+        android:background="@drawable/main_button_cart_bg_top"
         android:layout_marginBottom="16dp"
         android:paddingLeft="16dp"
         android:paddingRight="16dp"
         android:paddingTop="12dp"
         android:paddingBottom="12dp">
 
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_shopping_cart"
+            android:tint="@android:color/white"
+            android:layout_marginEnd="8dp" />
+
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="🛒 Carrito de Compras"
+            android:text="Carrito de Compras"
             android:textColor="@android:color/white"
-            android:textSize="18sp"
+            android:textSize="16sp"
             android:textStyle="bold"
             android:gravity="start|center_vertical" />
 

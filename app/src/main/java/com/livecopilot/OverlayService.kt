@@ -11,6 +11,7 @@ import android.provider.Settings
 import android.text.TextUtils
 import kotlin.math.*
 import android.content.Intent
+import android.net.Uri
 import android.graphics.PixelFormat
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
@@ -35,6 +36,9 @@ import com.livecopilot.data.CartManager
 import com.livecopilot.data.ImageManager
 import com.livecopilot.data.GalleryImage
 import com.livecopilot.utils.ImageUtils
+import com.livecopilot.data.FavoritesManager
+import com.livecopilot.data.Favorite
+import com.livecopilot.data.FavoriteType
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.GridLayoutManager
@@ -247,7 +251,12 @@ class OverlayService : Service() {
 
                 // --- Inicializar Favorites Modal ---
                 favoritesView = inflater.inflate(R.layout.favorites_modal, null)
-                favoritesParams = createCenteredModalParams()
+                favoritesParams = createCenteredModalParams().apply {
+                    // 80% del ancho de la pantalla + oscurecer fondo
+                    width = (resources.displayMetrics.widthPixels * 0.8f).toInt()
+                    flags = flags or WindowManager.LayoutParams.FLAG_DIM_BEHIND
+                    dimAmount = 0.4f
+                }
                 setupFavoritesViewListeners()
 
                 loadShortcutsFromPrefs()
@@ -294,10 +303,19 @@ class OverlayService : Service() {
     private fun showFan() {
         hideAllViews()
         currentState = BubbleState.FAN
-        
-        // El fan ahora es fullscreen
-        windowManager.addView(fanView, fanParams)
-        
+        // El fan ahora es fullscreen (agregar de forma segura)
+        try {
+            if (fanView.isAttachedToWindow) {
+                windowManager.updateViewLayout(fanView, fanParams)
+            } else {
+                windowManager.addView(fanView, fanParams)
+            }
+        } catch (e: IllegalStateException) {
+            try {
+                windowManager.updateViewLayout(fanView, fanParams)
+            } catch (_: Exception) { /* no-op */ }
+        }
+
         // Posicionar los botones del abanico dinámicamente
         positionFanButtons()
     }
@@ -352,7 +370,17 @@ class OverlayService : Service() {
         hideAllViews()
         currentState = BubbleState.CATALOG
         // El catálogo se centra automáticamente con gravity = CENTER
-        windowManager.addView(catalogView, catalogParams)
+        try {
+            if (catalogView.isAttachedToWindow) {
+                windowManager.updateViewLayout(catalogView, catalogParams)
+            } else {
+                windowManager.addView(catalogView, catalogParams)
+            }
+        } catch (e: IllegalStateException) {
+            try {
+                windowManager.updateViewLayout(catalogView, catalogParams)
+            } catch (_: Exception) { /* no-op */ }
+        }
     }
 
     private fun showProductsCatalog() {
@@ -365,7 +393,17 @@ class OverlayService : Service() {
         hideAllViews()
         currentState = BubbleState.PRODUCTS_CATALOG
         populateProductsCatalog()
-        windowManager.addView(productsCatalogView, productsCatalogParams)
+        try {
+            if (productsCatalogView.isAttachedToWindow) {
+                windowManager.updateViewLayout(productsCatalogView, productsCatalogParams)
+            } else {
+                windowManager.addView(productsCatalogView, productsCatalogParams)
+            }
+        } catch (e: IllegalStateException) {
+            try {
+                windowManager.updateViewLayout(productsCatalogView, productsCatalogParams)
+            } catch (_: Exception) { /* no-op */ }
+        }
     }
 
     private fun collapseToBubble() {
@@ -426,10 +464,7 @@ class OverlayService : Service() {
             currentState = BubbleState.COLLAPSED
         }
         fanView.findViewById<ImageView>(R.id.btn_favorites).setOnClickListener { 
-            val intent = Intent(this, FavoritesActivity::class.java)
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            startActivity(intent)
-            collapseToBubble()
+            showFavorites()
         }
     }
 
@@ -452,18 +487,21 @@ class OverlayService : Service() {
         shareDialogView.findViewById<Button>(R.id.btn_share_intent).setOnClickListener {
             selectedProduct?.let { product ->
                 shareProductWithIntent(product)
+                collapseToBubble()
             }
         }
         
         shareDialogView.findViewById<Button>(R.id.btn_copy_text).setOnClickListener {
             selectedProduct?.let { product ->
                 copyProductTextOnly(product)
+                collapseToBubble()
             }
         }
         
         shareDialogView.findViewById<Button>(R.id.btn_copy_image).setOnClickListener {
             selectedProduct?.let { product ->
                 copyProductImageOnly(product)
+                collapseToBubble()
             }
         }
         
@@ -630,7 +668,7 @@ class OverlayService : Service() {
 
     private fun setupGalleryViewListeners() {
         galleryView.findViewById<ImageView>(R.id.btn_close_gallery).setOnClickListener { 
-            showFan()
+            collapseToBubble()
         }
         
         // Configurar RecyclerView del modal de galería (masonry 3 columnas)
@@ -639,6 +677,7 @@ class OverlayService : Service() {
         
         galleryModalAdapter = GalleryModalAdapter(mutableListOf()) { image ->
             shareImageFromGallery(image)
+            collapseToBubble()
         }
         recyclerView.adapter = galleryModalAdapter
         
@@ -648,7 +687,7 @@ class OverlayService : Service() {
 
     private fun setupCartViewListeners() {
         cartView.findViewById<ImageView>(R.id.btn_close_cart).setOnClickListener { 
-            showFan()
+            collapseToBubble()
         }
         
         cartView.findViewById<Button>(R.id.btn_clear_cart).setOnClickListener {
@@ -657,6 +696,7 @@ class OverlayService : Service() {
         
         cartView.findViewById<Button>(R.id.btn_share_cart).setOnClickListener {
             shareCart()
+            collapseToBubble()
         }
         
         // Configurar RecyclerView del carrito
@@ -674,7 +714,67 @@ class OverlayService : Service() {
 
     private fun setupFavoritesViewListeners() {
         favoritesView.findViewById<ImageView>(R.id.btn_close_favorites).setOnClickListener { 
-            showFan()
+            collapseToBubble()
+        }
+        // RecyclerView de favoritos
+        val recyclerView = favoritesView.findViewById<RecyclerView>(R.id.favorites_recycler_overlay)
+        recyclerView?.layoutManager = LinearLayoutManager(this)
+        val adapter = FavoritesAdapter(mutableListOf(), { fav -> onOverlayFavoriteClick(fav) }, { _ ->
+            // En overlay, para editar/eliminar abre la actividad completa
+            val intent = Intent(this, FavoritesActivity::class.java)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
+            collapseToBubble()
+        })
+        recyclerView?.adapter = adapter
+        updateFavoritesOverlayDisplay()
+    }
+
+    private fun updateFavoritesOverlayDisplay() {
+        val recyclerView = favoritesView.findViewById<RecyclerView>(R.id.favorites_recycler_overlay) ?: return
+        val adapter = recyclerView.adapter as? FavoritesAdapter ?: return
+        val list = try { FavoritesManager(this).getAll() } catch (_: Exception) { emptyList() }
+        adapter.setData(list)
+        val empty = favoritesView.findViewById<TextView>(R.id.empty_favorites_overlay)
+        empty?.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
+    }
+
+    private fun onOverlayFavoriteClick(fav: Favorite) {
+        when (fav.type) {
+            FavoriteType.LINK -> {
+                // Copiar y notificar, y permitir abrir
+                copyToClipboard(fav.content)
+                Toast.makeText(this, "Enlace copiado", Toast.LENGTH_SHORT).show()
+            }
+            FavoriteType.TEXT -> {
+                copyToClipboard(fav.content)
+                Toast.makeText(this, "Texto copiado", Toast.LENGTH_SHORT).show()
+            }
+            FavoriteType.PDF -> openOrShareOverlay("application/pdf", fav.content)
+            FavoriteType.IMAGE -> openOrShareOverlay("image/*", fav.content)
+        }
+        collapseToBubble()
+    }
+
+    private fun openOrShareOverlay(mime: String, content: String) {
+        try {
+            val uri = Uri.parse(content)
+            val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, mime)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(viewIntent)
+        } catch (_: Exception) {
+            try {
+                val send = Intent(Intent.ACTION_SEND).apply {
+                    type = mime
+                    putExtra(Intent.EXTRA_STREAM, Uri.parse(content))
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                startActivity(Intent.createChooser(send, "Compartir").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            } catch (_: Exception) {
+                Toast.makeText(this, "No se pudo abrir/compartir", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -682,20 +782,51 @@ class OverlayService : Service() {
         hideAllViews()
         currentState = BubbleState.GALLERY
         updateGalleryModalDisplay() // Actualizar galería al mostrarlo
-        windowManager.addView(galleryView, galleryParams)
+        try {
+            if (galleryView.isAttachedToWindow) {
+                windowManager.updateViewLayout(galleryView, galleryParams)
+            } else {
+                windowManager.addView(galleryView, galleryParams)
+            }
+        } catch (e: IllegalStateException) {
+            try {
+                windowManager.updateViewLayout(galleryView, galleryParams)
+            } catch (_: Exception) { /* no-op */ }
+        }
     }
 
     private fun showCart() {
         hideAllViews()
         currentState = BubbleState.CART
         updateCartDisplay() // Actualizar carrito al mostrarlo
-        windowManager.addView(cartView, cartParams)
+        try {
+            if (cartView.isAttachedToWindow) {
+                windowManager.updateViewLayout(cartView, cartParams)
+            } else {
+                windowManager.addView(cartView, cartParams)
+            }
+        } catch (e: IllegalStateException) {
+            try {
+                windowManager.updateViewLayout(cartView, cartParams)
+            } catch (_: Exception) { /* no-op */ }
+        }
     }
 
     private fun showFavorites() {
         hideAllViews()
         currentState = BubbleState.FAVORITES
-        windowManager.addView(favoritesView, favoritesParams)
+        updateFavoritesOverlayDisplay()
+        try {
+            if (favoritesView.isAttachedToWindow) {
+                windowManager.updateViewLayout(favoritesView, favoritesParams)
+            } else {
+                windowManager.addView(favoritesView, favoritesParams)
+            }
+        } catch (e: IllegalStateException) {
+            try {
+                windowManager.updateViewLayout(favoritesView, favoritesParams)
+            } catch (_: Exception) { /* no-op */ }
+        }
     }
 
     private fun isAClick(startX: Float, endX: Float, startY: Float, endY: Float): Boolean {

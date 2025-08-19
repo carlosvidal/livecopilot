@@ -129,6 +129,20 @@ class FavoritesActivity : AppCompatActivity() {
     }
 
     private fun onFavoriteLongClick(fav: Favorite) {
+        val options = arrayOf("Editar", "Eliminar")
+        AlertDialog.Builder(this)
+            .setTitle(fav.name)
+            .setItems(options) { dialog, which ->
+                when (which) {
+                    0 -> showEditFavoriteDialog(fav)
+                    1 -> confirmDeleteFavorite(fav)
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun confirmDeleteFavorite(fav: Favorite) {
         AlertDialog.Builder(this)
             .setTitle("Eliminar favorito")
             .setMessage("¿Eliminar '${fav.name}'?")
@@ -138,6 +152,71 @@ class FavoritesActivity : AppCompatActivity() {
                 loadFavorites()
             }
             .show()
+    }
+
+    private fun showEditFavoriteDialog(fav: Favorite) {
+        val view = LayoutInflater.from(this).inflate(R.layout.dialog_add_favorite, null)
+        val typeSpinner = view.findViewById<Spinner>(R.id.input_type)
+        val nameInput = view.findViewById<EditText>(R.id.input_name)
+        val contentInput = view.findViewById<EditText>(R.id.input_content)
+        val pickButton = view.findViewById<Button>(R.id.btn_pick_file)
+        contentInputRef = contentInput
+
+        // Prefill
+        nameInput.setText(fav.name)
+        contentInput.setText(fav.content)
+        typeSpinner.setSelection(
+            when (fav.type) {
+                FavoriteType.LINK -> 0
+                FavoriteType.PDF -> 1
+                FavoriteType.IMAGE -> 2
+                FavoriteType.TEXT -> 3
+            }
+        )
+
+        fun updatePickerVisibility(position: Int) {
+            pickButton.visibility = if (position == 1 || position == 2) Button.VISIBLE else Button.GONE
+        }
+        updatePickerVisibility(typeSpinner.selectedItemPosition)
+        typeSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: android.view.View?, position: Int, id: Long) {
+                updatePickerVisibility(position)
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+
+        pickButton.setOnClickListener {
+            val idx = typeSpinner.selectedItemPosition
+            val mime = when (idx) {
+                1 -> "application/pdf"
+                2 -> "image/*"
+                else -> "*/*"
+            }
+            try {
+                pickDocument.launch(arrayOf(mime))
+            } catch (_: Exception) {
+                Toast.makeText(this, "No se pudo abrir el selector", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Editar favorito")
+            .setView(view)
+            .setNegativeButton("Cancelar", null)
+            .setPositiveButton("Guardar") { _, _ ->
+                val type = spinnerSelectionToType(typeSpinner.selectedItemPosition)
+                val name = nameInput.text?.toString()?.trim().orEmpty()
+                val content = contentInput.text?.toString()?.trim().orEmpty()
+                if (name.isEmpty() || content.isEmpty()) {
+                    Toast.makeText(this, "Completa nombre y contenido", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                favoritesManager.update(fav.copy(type = type, name = name, content = content))
+                loadFavorites()
+            }
+            .create()
+        dialog.setOnDismissListener { contentInputRef = null }
+        dialog.show()
     }
 
     private fun openLink(url: String) {

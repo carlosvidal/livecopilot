@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="300dp"
-    android:layout_height="400dp"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="@drawable/shortcut_bg"
-    android:padding="16dp">
+    android:background="@drawable/modal_bg_rounded"
+    android:padding="0dp">
 
     <!-- Header -->
     <LinearLayout
@@ -12,12 +12,18 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:layout_marginBottom="16dp">
+        android:background="@drawable/main_button_favorites_bg_top"
+        android:layout_marginBottom="16dp"
+        android:paddingLeft="16dp"
+        android:paddingRight="16dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp">
 
         <ImageView
             android:layout_width="24dp"
             android:layout_height="24dp"
             android:src="@drawable/ic_favorite"
+            android:tint="@android:color/white"
             android:layout_marginEnd="8dp" />
 
         <TextView
@@ -25,7 +31,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Favoritos"
-            android:textSize="18sp"
+            android:textSize="16sp"
             android:textStyle="bold"
             android:textColor="@android:color/white" />
 
@@ -33,24 +39,44 @@
             android:id="@+id/btn_close_favorites"
             android:layout_width="32dp"
             android:layout_height="32dp"
-            android:background="@drawable/gray_circle_bg"
+            android:background="@android:color/transparent"
             android:src="@drawable/ic_close"
+            android:tint="@android:color/white"
             android:scaleType="center"
-            android:padding="6dp"
+            android:padding="0dp"
             android:clickable="true"
             android:focusable="true" />
 
     </LinearLayout>
 
-    <!-- Content -->
-    <TextView
+    <!-- Contenido -->
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:text="Mensajes Favoritos\n\nAquí podrás:\n• Guardar mensajes frecuentes\n• Acceso rápido a frases especiales\n• Personalizar tus favoritos\n• Organizar por categorías\n\n(Próximamente)"
-        android:textColor="@android:color/white"
-        android:textSize="14sp"
-        android:gravity="center"
-        android:lineSpacingExtra="4dp" />
+        android:paddingLeft="16dp"
+        android:paddingRight="16dp"
+        android:paddingBottom="16dp">
+
+        <TextView
+            android:id="@+id/empty_favorites_overlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:text="⭐ No hay favoritos\n\nAgrega favoritos desde la app principal"
+            android:textColor="@android:color/darker_gray"
+            android:textSize="14sp"
+            android:gravity="center"
+            android:lineSpacingExtra="4dp"
+            android:visibility="gone" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/favorites_recycler_overlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="4dp"
+            android:clipToPadding="false"
+            android:overScrollMode="never" />
+
+    </FrameLayout>
 
 </LinearLayout>

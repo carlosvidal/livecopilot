@@ -53,13 +53,16 @@ class MainActivity : AppCompatActivity() {
 
         // Botón Galería
         findViewById<FrameLayout>(R.id.btn_gallery).setOnClickListener {
+            shouldShowBubbleOnPause = false // No mostrar burbuja al navegar internamente
             val intent = Intent(this, GalleryActivity::class.java)
             startActivity(intent)
         }
 
         // Botón Favoritos
         findViewById<FrameLayout>(R.id.btn_favorites).setOnClickListener {
-            Toast.makeText(this, "Favoritos - Próximamente", Toast.LENGTH_SHORT).show()
+            shouldShowBubbleOnPause = false // No mostrar burbuja al navegar internamente
+            val intent = Intent(this, FavoritesActivity::class.java)
+            startActivity(intent)
         }
 
         // Botón Settings

@@ -62,7 +62,7 @@
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:background="@drawable/fan_button_settings_bg"
-        android:src="@drawable/ic_settings"
+        android:src="@drawable/ic_home"
         android:tint="@android:color/white"
         android:scaleType="center"
         android:padding="12dp"
