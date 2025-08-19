@@ -7,6 +7,7 @@ import android.widget.ImageView
 import androidx.recyclerview.widget.RecyclerView
 import com.livecopilot.data.GalleryImage
 import com.livecopilot.utils.ImageUtils
+import coil.load
 
 class GalleryAdapter(
     private val images: MutableList<GalleryImage>,
@@ -26,28 +27,23 @@ class GalleryAdapter(
     override fun onBindViewHolder(holder: GalleryViewHolder, position: Int) {
         val image = images[position]
 
-        // Cargar imagen de la galería
+        // Cargar imagen de la galería con Coil (async + cache)
         try {
             val uri = ImageUtils.getImageUri(holder.itemView.context, image.imagePath)
+            holder.imageView.scaleType = ImageView.ScaleType.CENTER_CROP
             if (uri != null) {
-                holder.imageView.setImageURI(uri)
-                holder.imageView.scaleType = ImageView.ScaleType.CENTER_CROP
-                
-                // Para efecto masonry, generar altura aleatoria basada en el hash de la imagen
-                val randomHeight = 150 + (image.id.hashCode() % 150).let { if (it < 0) -it else it }
-                holder.imageView.layoutParams.height = (randomHeight * holder.itemView.context.resources.displayMetrics.density).toInt()
-                holder.imageView.requestLayout()
+                holder.imageView.load(uri) {
+                    crossfade(true)
+                    placeholder(R.drawable.ic_image)
+                    error(R.drawable.ic_image)
+                }
             } else {
                 holder.imageView.setImageResource(R.drawable.ic_image)
                 holder.imageView.scaleType = ImageView.ScaleType.CENTER
-                holder.imageView.layoutParams.height = (200 * holder.itemView.context.resources.displayMetrics.density).toInt()
-                holder.imageView.requestLayout()
             }
         } catch (e: Exception) {
             holder.imageView.setImageResource(R.drawable.ic_image)
             holder.imageView.scaleType = ImageView.ScaleType.CENTER
-            holder.imageView.layoutParams.height = (200 * holder.itemView.context.resources.displayMetrics.density).toInt()
-            holder.imageView.requestLayout()
         }
         
         // Click listener
