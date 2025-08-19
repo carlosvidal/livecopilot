@@ -4,7 +4,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
-import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.livecopilot.data.GalleryImage
 import com.livecopilot.utils.ImageUtils
@@ -16,8 +15,6 @@ class GalleryAdapter(
 
     class GalleryViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val imageView: ImageView = view.findViewById(R.id.gallery_item_image)
-        val nameText: TextView = view.findViewById(R.id.gallery_item_name)
-        val priceText: TextView = view.findViewById(R.id.gallery_item_price)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): GalleryViewHolder {
@@ -28,14 +25,7 @@ class GalleryAdapter(
 
     override fun onBindViewHolder(holder: GalleryViewHolder, position: Int) {
         val image = images[position]
-        
-        holder.nameText.text = image.name
-        holder.priceText.text = if (image.description.isNotEmpty()) {
-            image.description
-        } else {
-            "Sin descripción"
-        }
-        
+
         // Cargar imagen de la galería
         try {
             val uri = ImageUtils.getImageUri(holder.itemView.context, image.imagePath)
