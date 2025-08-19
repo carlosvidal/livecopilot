@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">LiveCopilot</string>
+    <string name="start">Start LiveCopilot</string>
+    <string name="accessibility_service_description">LiveCopilot needs accessibility access to automatically paste text into other apps like WhatsApp.</string>
+    <string name="prompt_favorite_type">Select type</string>
+
+    <!-- Overlay notifications -->
+    <string name="notif_channel_name">LiveCopilot Overlay</string>
+    <string name="notif_title_active">LiveCopilot active</string>
+    <string name="notif_text_running">Floating bubble is running</string>
+
+    <!-- Chooser titles -->
+    <string name="chooser_share_cart">Share cart:</string>
+    <string name="chooser_share_image">Share image:</string>
+    <string name="chooser_share">Share</string>
+
+    <!-- Toasts -->
+    <string name="toast_link_copied">Link copied</string>
+    <string name="toast_text_copied">Text copied</string>
+    <string name="toast_product_added">Product added to cart</string>
+    <string name="toast_product_add_error">Error adding product</string>
+    <string name="toast_cart_emptied">Cart emptied</string>
+    <string name="toast_cart_empty">The cart is empty</string>
+    <string name="toast_product_copied">Product copied to clipboard</string>
+    <string name="toast_text_image_hint">Text copied. For the image: long-press in the field → Paste image</string>
+    <string name="toast_image_copied_hint">Image copied - long-press in the field → Paste</string>
+    <string name="toast_image_not_found">Image not found</string>
+    <string name="toast_error_copy_image">Error copying image</string>
+    <string name="toast_error_share_image">Error sharing image</string>
+
+    <!-- Cart/share text labels -->
+    <string name="cart_text_title">🛒 MY SHOPPING CART</string>
+    <string name="cart_text_quantity">Quantity</string>
+    <string name="cart_text_price">Price</string>
+    <string name="cart_text_subtotal">Subtotal</string>
+    <string name="cart_text_total">TOTAL</string>
+    <string name="cart_text_footer">📱 Sent with LiveCopilot</string>
+    <string name="price_not_specified">Price not specified</string>
+    <string name="toast_open_share_error">Could not open/share</string>
+</resources>

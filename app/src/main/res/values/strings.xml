@@ -3,4 +3,41 @@
     <string name="app_name">LiveCopilot</string>
     <string name="start">Iniciar LiveCopilot</string>
     <string name="accessibility_service_description">LiveCopilot necesita acceso de accesibilidad para pegar texto automáticamente en otras aplicaciones como WhatsApp</string>
+    <string name="prompt_favorite_type">Selecciona el tipo</string>
+
+    <!-- Overlay notifications -->
+    <string name="notif_channel_name">LiveCopilot Overlay</string>
+    <string name="notif_title_active">LiveCopilot activo</string>
+    <string name="notif_text_running">Burbuja flotante en ejecución</string>
+
+    <!-- Chooser titles -->
+    <string name="chooser_share_cart">Compartir carrito:</string>
+    <string name="chooser_share_image">Compartir imagen:</string>
+    <string name="chooser_share">Compartir</string>
+
+    <!-- Toasts -->
+    <string name="toast_link_copied">Enlace copiado</string>
+    <string name="toast_text_copied">Texto copiado</string>
+    <string name="toast_product_added">Producto agregado al carrito</string>
+    <string name="toast_product_add_error">Error al agregar producto</string>
+    <string name="toast_cart_emptied">Carrito vaciado</string>
+    <string name="toast_cart_empty">El carrito está vacío</string>
+    <string name="toast_product_copied">Producto copiado al portapapeles</string>
+    <string name="toast_text_image_hint">Texto copiado. Para la imagen: mantén presionado en el campo → Pegar imagen</string>
+    <string name="toast_image_copied_hint">Imagen copiada - mantén presionado en el campo → Pegar</string>
+    <string name="toast_image_not_found">Imagen no encontrada</string>
+    <string name="toast_error_copy_image">Error al copiar imagen</string>
+    <string name="toast_error_share_image">Error al compartir imagen</string>
+    <string name="toast_auto_paste_done">Texto pegado automáticamente</string>
+
+    <!-- Cart/share text labels -->
+    <string name="cart_text_title">🛒 MI CARRITO DE COMPRAS</string>
+    <string name="cart_text_quantity">Cantidad</string>
+    <string name="cart_text_price">Precio</string>
+    <string name="cart_text_subtotal">Subtotal</string>
+    <string name="cart_text_total">TOTAL</string>
+    <string name="cart_text_footer">📱 Enviado con LiveCopilot</string>
+    <string name="price_not_specified">Precio no especificado</string>
+    <string name="toast_open_share_error">No se pudo abrir/compartir</string>
+    <string name="toast_product_no_image">Este producto no tiene imagen</string>
 </resources>
