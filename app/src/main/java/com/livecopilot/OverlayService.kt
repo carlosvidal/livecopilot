@@ -44,6 +44,7 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.StaggeredGridLayoutManager
 import java.io.File
+import com.livecopilot.util.CurrencyUtils
 
 class OverlayService : Service() {
     private lateinit var windowManager: WindowManager
@@ -148,14 +149,14 @@ class OverlayService : Service() {
 
     private fun startInForeground() {
         val channelId = "livecopilot_overlay"
-        val channelName = "LiveCopilot Overlay"
+        val channelName = getString(R.string.notif_channel_name)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val chan = NotificationChannel(channelId, channelName, NotificationManager.IMPORTANCE_NONE)
             (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(chan)
         }
         val notification: Notification = NotificationCompat.Builder(this, channelId)
-            .setContentTitle("LiveCopilot activo")
-            .setContentText("Burbuja flotante en ejecución")
+            .setContentTitle(getString(R.string.notif_title_active))
+            .setContentText(getString(R.string.notif_text_running))
             .setSmallIcon(R.mipmap.ic_launcher)
             .setOngoing(true)
             .build()
@@ -411,7 +412,19 @@ class OverlayService : Service() {
         currentState = BubbleState.COLLAPSED
         bubbleParams.x = lastBubbleX
         bubbleParams.y = lastBubbleY
-        windowManager.addView(bubbleView, bubbleParams)
+        try {
+            if (::bubbleView.isInitialized) {
+                if (bubbleView.isAttachedToWindow) {
+                    windowManager.updateViewLayout(bubbleView, bubbleParams)
+                } else {
+                    windowManager.addView(bubbleView, bubbleParams)
+                }
+            }
+        } catch (e: IllegalStateException) {
+            try {
+                windowManager.updateViewLayout(bubbleView, bubbleParams)
+            } catch (_: Exception) { /* no-op */ }
+        }
     }
 
     private fun hideAllViews() {
@@ -744,11 +757,11 @@ class OverlayService : Service() {
             FavoriteType.LINK -> {
                 // Copiar y notificar, y permitir abrir
                 copyToClipboard(fav.content)
-                Toast.makeText(this, "Enlace copiado", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.toast_link_copied), Toast.LENGTH_SHORT).show()
             }
             FavoriteType.TEXT -> {
                 copyToClipboard(fav.content)
-                Toast.makeText(this, "Texto copiado", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.toast_text_copied), Toast.LENGTH_SHORT).show()
             }
             FavoriteType.PDF -> openOrShareOverlay("application/pdf", fav.content)
             FavoriteType.IMAGE -> openOrShareOverlay("image/*", fav.content)
@@ -771,9 +784,9 @@ class OverlayService : Service() {
                     putExtra(Intent.EXTRA_STREAM, Uri.parse(content))
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
-                startActivity(Intent.createChooser(send, "Compartir").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                startActivity(Intent.createChooser(send, getString(R.string.chooser_share)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             } catch (_: Exception) {
-                Toast.makeText(this, "No se pudo abrir/compartir", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.toast_open_share_error), Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -826,6 +839,30 @@ class OverlayService : Service() {
             try {
                 windowManager.updateViewLayout(favoritesView, favoritesParams)
             } catch (_: Exception) { /* no-op */ }
+        }
+    }
+
+    private fun updateCartDisplay() {
+        if (!::cartManager.isInitialized || !::cartAdapter.isInitialized) return
+        runOnUiThread {
+            val items = cartManager.getCartItems()
+            cartAdapter.updateItems(items)
+
+            // Actualizar total
+            val total = items.sumOf { it.product.price * it.quantity }
+            val totalText = cartView.findViewById<TextView>(R.id.cart_total)
+            totalText.text = CurrencyUtils.formatAmount(this, total)
+
+            // Mostrar/ocultar mensaje de carrito vacío
+            val emptyMessage = cartView.findViewById<TextView>(R.id.empty_cart_message)
+            val recyclerView = cartView.findViewById<RecyclerView>(R.id.cart_recycler_view)
+            if (items.isEmpty()) {
+                emptyMessage.visibility = View.VISIBLE
+                recyclerView.visibility = View.GONE
+            } else {
+                emptyMessage.visibility = View.GONE
+                recyclerView.visibility = View.VISIBLE
+            }
         }
     }
 
@@ -957,9 +994,9 @@ class OverlayService : Service() {
 
             // Precio del producto
             val priceText = if (product.price > 0) {
-                "${'$'}" + String.format("%.2f", product.price)
+                CurrencyUtils.formatAmount(this, product.price)
             } else {
-                "Precio no especificado"
+                getString(R.string.price_not_specified)
             }
             val priceView = TextView(this).apply {
                 layoutParams = LinearLayout.LayoutParams(
@@ -1070,7 +1107,7 @@ class OverlayService : Service() {
         // Llenar textos
         shareDialogView.findViewById<TextView>(R.id.dialog_product_name).text = product.name
         shareDialogView.findViewById<TextView>(R.id.dialog_product_price).text = 
-            if (product.price > 0) "\$${String.format("%.2f", product.price)}" else "Precio no especificado"
+            if (product.price > 0) CurrencyUtils.formatAmount(this, product.price) else getString(R.string.price_not_specified)
     }
     
     private fun shareProductWithIntent(product: Product) {
@@ -1081,7 +1118,7 @@ class OverlayService : Service() {
                 append("\n📝 ${product.description}")
             }
             if (product.price > 0) {
-                append("\n💰 \$${String.format("%.2f", product.price)}")
+                append("\n💰 ${CurrencyUtils.formatAmount(this@OverlayService, product.price)}")
             }
             if (product.link.isNotEmpty()) {
                 append("\n🔗 ${product.link}")
@@ -1124,14 +1161,14 @@ class OverlayService : Service() {
                 }
             }
             
-            val chooser = Intent.createChooser(shareIntent, "Compartir producto:")
+            val chooser = Intent.createChooser(shareIntent, getString(R.string.chooser_share))
             chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             startActivity(chooser)
             
         } catch (e: Exception) {
             // Fallback: copiar al portapapeles
             copyTextToClipboard(productText)
-            Toast.makeText(this, "Producto copiado al portapapeles", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.toast_product_copied), Toast.LENGTH_SHORT).show()
         }
         
         collapseToBubble()
@@ -1145,7 +1182,7 @@ class OverlayService : Service() {
                 append("\n📝 ${product.description}")
             }
             if (product.price > 0) {
-                append("\n💰 \$${String.format("%.2f", product.price)}")
+                append("\n💰 ${CurrencyUtils.formatAmount(this@OverlayService, product.price)}")
             }
             if (product.link.isNotEmpty()) {
                 append("\n🔗 ${product.link}")
@@ -1285,9 +1322,9 @@ class OverlayService : Service() {
         if (::cartManager.isInitialized) {
             val success = cartManager.addToCart(product)
             if (success) {
-                Toast.makeText(this, "Producto agregado al carrito", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.toast_product_added), Toast.LENGTH_SHORT).show()
             } else {
-                Toast.makeText(this, "Error al agregar producto", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.toast_product_add_error), Toast.LENGTH_SHORT).show()
             }
         }
         hideShareDialog()
@@ -1308,7 +1345,7 @@ class OverlayService : Service() {
         if (::cartManager.isInitialized) {
             cartManager.clearCart()
             updateCartDisplay()
-            Toast.makeText(this, "Carrito vaciado", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.toast_cart_emptied), Toast.LENGTH_SHORT).show()
         }
     }
     
@@ -1316,7 +1353,7 @@ class OverlayService : Service() {
         if (::cartManager.isInitialized) {
             val cartItems = cartManager.getCartItems()
             if (cartItems.isEmpty()) {
-                Toast.makeText(this, "El carrito está vacío", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.toast_cart_empty), Toast.LENGTH_SHORT).show()
                 return
             }
             
@@ -1332,63 +1369,36 @@ class OverlayService : Service() {
             }
             
             try {
-                val chooser = Intent.createChooser(shareIntent, "Compartir carrito:")
+                val chooser = Intent.createChooser(shareIntent, getString(R.string.chooser_share_cart))
                 chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 startActivity(chooser)
             } catch (e: Exception) {
                 copyTextToClipboard(cartText)
-                Toast.makeText(this, "Carrito copiado al portapapeles", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.toast_product_copied), Toast.LENGTH_SHORT).show()
             }
         }
     }
     
     private fun generateCartText(cartItems: List<com.livecopilot.data.CartItem>): String {
         val builder = StringBuilder()
-        builder.append("🛒 MI CARRITO DE COMPRAS\n")
+        builder.append(getString(R.string.cart_text_title) + "\n")
         builder.append("━━━━━━━━━━━━━━━━━━━━━━━\n\n")
-        
+
         var total = 0.0
         cartItems.forEach { item ->
             val subtotal = item.product.price * item.quantity
             total += subtotal
-            
             builder.append("• ${item.product.name}\n")
-            builder.append("  Cantidad: ${item.quantity}\n")
-            builder.append("  Precio: $%.2f\n".format(item.product.price))
-            builder.append("  Subtotal: $%.2f\n\n".format(subtotal))
+            builder.append("  ${getString(R.string.cart_text_quantity)}: ${item.quantity}\n")
+            builder.append("  ${getString(R.string.cart_text_price)}: ${CurrencyUtils.formatAmount(this, item.product.price)}\n")
+            builder.append("  ${getString(R.string.cart_text_subtotal)}: ${CurrencyUtils.formatAmount(this, subtotal)}\n\n")
         }
-        
+
         builder.append("━━━━━━━━━━━━━━━━━━━━━━━\n")
-        builder.append("💰 TOTAL: $%.2f\n\n".format(total))
-        builder.append("📱 Enviado con LiveCopilot")
+        builder.append("💰 ${getString(R.string.cart_text_total)}: ${CurrencyUtils.formatAmount(this, total)}\n\n")
+        builder.append(getString(R.string.cart_text_footer))
         
         return builder.toString()
-    }
-    
-    private fun updateCartDisplay() {
-        if (::cartManager.isInitialized && ::cartAdapter.isInitialized) {
-            runOnUiThread {
-                val cartItems = cartManager.getCartItems()
-                cartAdapter.updateItems(cartItems)
-                
-                // Actualizar total
-                val total = cartItems.sumOf { it.product.price * it.quantity }
-                val totalText = cartView.findViewById<TextView>(R.id.cart_total)
-                totalText.text = "$%.2f".format(total)
-                
-                // Mostrar/ocultar mensaje de carrito vacío
-                val emptyMessage = cartView.findViewById<TextView>(R.id.empty_cart_message)
-                val recyclerView = cartView.findViewById<RecyclerView>(R.id.cart_recycler_view)
-                
-                if (cartItems.isEmpty()) {
-                    emptyMessage.visibility = View.VISIBLE
-                    recyclerView.visibility = View.GONE
-                } else {
-                    emptyMessage.visibility = View.GONE
-                    recyclerView.visibility = View.VISIBLE
-                }
-            }
-        }
     }
     
     // Gallery modal functionality methods
@@ -1433,15 +1443,15 @@ class OverlayService : Service() {
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
                 
-                val chooser = Intent.createChooser(shareIntent, "Compartir imagen:")
+                val chooser = Intent.createChooser(shareIntent, getString(R.string.chooser_share_image))
                 chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 startActivity(chooser)
                 
             } else {
-                Toast.makeText(this, "Imagen no encontrada", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.toast_image_not_found), Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
-            Toast.makeText(this, "Error al compartir imagen", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.toast_error_share_image), Toast.LENGTH_SHORT).show()
         }
         
         collapseToBubble()

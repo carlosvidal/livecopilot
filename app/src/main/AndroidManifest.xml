@@ -14,7 +14,8 @@
         android:label="LiveCopilot"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.LiveCopilot">
+        android:theme="@style/Theme.LiveCopilot"
+        android:name=".LiveCopilotApp">
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -40,12 +41,7 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
         </service>
-
-        <activity
-            android:name=".SettingsActivity"
-            android:exported="false"
-            android:parentActivityName=".MainActivity" />
-
+        
         <activity
             android:name=".CatalogActivity"
             android:exported="false" />
@@ -62,6 +58,11 @@
         <activity
             android:name=".FavoritesActivity"
             android:exported="false" />
+
+        <activity
+            android:name=".PreferencesActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity" />
 
         <activity
             android:name=".ConfigurationActivity"

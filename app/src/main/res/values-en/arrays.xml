@@ -1,22 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string-array name="favorite_types">
-        <item>Enlace</item>
+        <item>Link</item>
         <item>PDF</item>
-        <item>Imagen</item>
-        <item>Texto</item>
+        <item>Image</item>
+        <item>Text</item>
     </string-array>
 
     <!-- Preferences: Languages (display and codes) -->
     <string-array name="pref_languages_display">
-        <item>Predeterminado del sistema</item>
-        <item>Español (México)</item>
-        <item>Español (España)</item>
+        <item>System default</item>
+        <item>Spanish (Mexico)</item>
+        <item>Spanish (Spain)</item>
         <item>English (United States)</item>
         <item>English (United Kingdom)</item>
-        <item>Português (Brasil)</item>
-        <item>Français (France)</item>
-        <item>Deutsch (Deutschland)</item>
+        <item>Portuguese (Brazil)</item>
+        <item>French (France)</item>
+        <item>German (Germany)</item>
     </string-array>
 
     <string-array name="pref_languages_values">
@@ -34,11 +34,11 @@
     <string-array name="pref_currencies_display">
         <item>USD — US Dollar</item>
         <item>EUR — Euro</item>
-        <item>MXN — Peso mexicano</item>
-        <item>COP — Peso colombiano</item>
-        <item>BRL — Real brasileño</item>
-        <item>ARS — Peso argentino</item>
-        <item>CLP — Peso chileno</item>
+        <item>MXN — Mexican Peso</item>
+        <item>COP — Colombian Peso</item>
+        <item>BRL — Brazilian Real</item>
+        <item>ARS — Argentine Peso</item>
+        <item>CLP — Chilean Peso</item>
     </string-array>
 
     <string-array name="pref_currencies_values">

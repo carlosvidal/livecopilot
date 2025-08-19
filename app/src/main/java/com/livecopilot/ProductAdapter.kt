@@ -9,8 +9,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.livecopilot.data.Product
 import com.livecopilot.utils.ImageUtils
-import java.text.NumberFormat
-import java.util.Locale
+import com.livecopilot.util.CurrencyUtils
 
 class ProductAdapter(
     private val products: List<Product>,
@@ -37,8 +36,7 @@ class ProductAdapter(
         holder.descriptionText.text = product.description
         
         // Formatear precio
-        val format = NumberFormat.getCurrencyInstance(Locale.getDefault())
-        holder.priceText.text = format.format(product.price)
+        holder.priceText.text = CurrencyUtils.formatAmount(holder.itemView.context, product.price)
         
         // Cargar imagen del producto
         if (product.imageUri.isNotEmpty()) {

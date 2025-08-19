@@ -8,8 +8,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.livecopilot.data.CartItem
 import com.livecopilot.utils.ImageUtils
-import java.text.NumberFormat
-import java.util.Locale
+import com.livecopilot.util.CurrencyUtils
 
 class CartAdapter(
     private val cartItems: MutableList<CartItem>,
@@ -37,9 +36,8 @@ class CartAdapter(
         
         holder.nameText.text = product.name
         
-        // Formatear precio unitario
-        val format = NumberFormat.getCurrencyInstance(Locale.getDefault())
-        holder.priceText.text = format.format(product.price)
+        // Formatear precio unitario con preferencias de moneda/idioma
+        holder.priceText.text = CurrencyUtils.formatAmount(holder.itemView.context, product.price)
         
         // Mostrar cantidad
         holder.quantityText.text = cartItem.quantity.toString()

@@ -10,6 +10,7 @@ import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
+import com.livecopilot.PreferencesActivity
 
 
 class MainActivity : AppCompatActivity() {
@@ -68,7 +69,7 @@ class MainActivity : AppCompatActivity() {
         // Botón Settings
         findViewById<FrameLayout>(R.id.btn_settings).setOnClickListener {
             shouldShowBubbleOnPause = false // No mostrar burbuja al navegar internamente
-            val intent = Intent(this, SettingsActivity::class.java)
+            val intent = Intent(this, PreferencesActivity::class.java)
             startActivity(intent)
         }
     }
