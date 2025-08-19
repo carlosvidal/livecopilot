@@ -8,14 +8,21 @@ import android.content.Intent
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import com.livecopilot.utils.ImageUtils
 
 class AutoPasteAccessibilityService : AccessibilityService() {
 
     companion object {
         const val ACTION_PASTE_TEXT = "com.livecopilot.PASTE_TEXT"
+        const val ACTION_PASTE_PRODUCT = "com.livecopilot.PASTE_PRODUCT"
         const val EXTRA_TEXT = "extra_text"
+        const val EXTRA_IMAGE_PATH = "extra_image_path"
         var instance: AutoPasteAccessibilityService? = null
     }
+    
+    private val handler = Handler(Looper.getMainLooper())
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -36,10 +43,19 @@ class AutoPasteAccessibilityService : AccessibilityService() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_PASTE_TEXT) {
-            val textToPaste = intent.getStringExtra(EXTRA_TEXT)
-            if (!textToPaste.isNullOrEmpty()) {
-                pasteText(textToPaste)
+        when (intent?.action) {
+            ACTION_PASTE_TEXT -> {
+                val textToPaste = intent.getStringExtra(EXTRA_TEXT)
+                if (!textToPaste.isNullOrEmpty()) {
+                    pasteText(textToPaste)
+                }
+            }
+            ACTION_PASTE_PRODUCT -> {
+                val textToPaste = intent.getStringExtra(EXTRA_TEXT)
+                val imagePath = intent.getStringExtra(EXTRA_IMAGE_PATH)
+                if (!textToPaste.isNullOrEmpty()) {
+                    pasteProductWithImage(textToPaste, imagePath)
+                }
             }
         }
         return START_NOT_STICKY
@@ -88,5 +104,37 @@ class AutoPasteAccessibilityService : AccessibilityService() {
             }
         }
         return null
+    }
+    
+    private fun pasteProductWithImage(text: String, imagePath: String?) {
+        try {
+            // Paso 1: Pegar el texto
+            pasteText(text)
+            
+            // Paso 2: Si hay imagen, copiarla al portapapeles y mostrar instrucciones
+            if (!imagePath.isNullOrEmpty()) {
+                handler.postDelayed({
+                    copyImageToClipboard(imagePath)
+                }, 1500) // Esperar 1.5 segundos para que se pegue el texto primero
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+    
+    private fun copyImageToClipboard(imagePath: String) {
+        try {
+            val imageUri = ImageUtils.getImageUri(this, imagePath)
+            if (imageUri != null) {
+                val clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clip = ClipData.newUri(contentResolver, "Imagen del producto", imageUri)
+                clipboardManager.setPrimaryClip(clip)
+                
+                // Mostrar notificación o toast indicando que la imagen está lista para pegar
+                // (esto puede requerir permisos de notificaciones)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 }

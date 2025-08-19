@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/transparent">
+
+    <!-- Botón Cerrar - Reemplaza la burbuja en su posición original -->
+    <ImageView
+        android:id="@+id/btn_close"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:background="@drawable/fan_button_close_bg"
+        android:src="@drawable/ic_close"
+        android:tint="@android:color/white"
+        android:scaleType="center"
+        android:padding="16dp"
+        android:clickable="true"
+        android:focusable="true" />
+
+    <!-- Los botones del abanico serán posicionados dinámicamente -->
+    <ImageView
+        android:id="@+id/btn_catalog"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:background="@drawable/fan_button_catalog_bg"
+        android:src="@drawable/ic_box"
+        android:tint="@android:color/white"
+        android:scaleType="center"
+        android:padding="12dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/btn_gallery"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:background="@drawable/fan_button_gallery_bg"
+        android:src="@drawable/ic_image"
+        android:tint="@android:color/white"
+        android:scaleType="center"
+        android:padding="12dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/btn_cart"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:background="@drawable/fan_button_cart_bg"
+        android:src="@drawable/ic_shopping_cart"
+        android:tint="@android:color/white"
+        android:scaleType="center"
+        android:padding="12dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/btn_settings"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:background="@drawable/fan_button_settings_bg"
+        android:src="@drawable/ic_home"
+        android:tint="@android:color/white"
+        android:scaleType="center"
+        android:padding="12dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/btn_favorites"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:background="@drawable/fan_button_favorites_bg"
+        android:src="@drawable/ic_favorite"
+        android:tint="@android:color/white"
+        android:scaleType="center"
+        android:padding="12dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone" />
+
+</FrameLayout>

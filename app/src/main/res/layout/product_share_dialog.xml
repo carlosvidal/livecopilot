@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="280dp"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/dialog_shadow_bg"
+    android:padding="20dp">
+
+    <!-- Título -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="¿Cómo quieres compartir?"
+        android:textColor="@android:color/black"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginBottom="16dp" />
+
+    <!-- Información del producto -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="20dp"
+        android:gravity="center_vertical">
+
+        <ImageView
+            android:id="@+id/dialog_product_image"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:scaleType="centerCrop"
+            android:background="@drawable/shortcut_bg" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:layout_marginStart="12dp">
+
+            <TextView
+                android:id="@+id/dialog_product_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Nombre del producto"
+                android:textColor="@android:color/black"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/dialog_product_price"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="$0.00"
+                android:textColor="@android:color/darker_gray"
+                android:textSize="12sp"
+                android:layout_marginTop="2dp" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- Botones de acción -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="8dp">
+
+        <!-- Botón Compartir (para apps de mensajería) -->
+        <Button
+            android:id="@+id/btn_share_intent"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:text="🚀 Compartir con Apps"
+            android:textColor="@android:color/white"
+            android:background="@drawable/rounded_button_blue"
+            android:textSize="14sp"
+            android:layout_marginBottom="8dp"
+            style="?android:attr/borderlessButtonStyle" />
+
+        <!-- Botón Copiar Descripción -->
+        <Button
+            android:id="@+id/btn_copy_text"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:text="📝 Copiar Descripción"
+            android:textColor="@android:color/white"
+            android:background="@drawable/rounded_button_green"
+            android:textSize="14sp"
+            android:layout_marginBottom="8dp"
+            style="?android:attr/borderlessButtonStyle" />
+
+        <!-- Botón Copiar Imagen -->
+        <Button
+            android:id="@+id/btn_copy_image"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:text="🖼️ Copiar Imagen"
+            android:textColor="@android:color/white"
+            android:background="@drawable/rounded_button_orange"
+            android:textSize="14sp"
+            android:layout_marginBottom="8dp"
+            style="?android:attr/borderlessButtonStyle" />
+
+        <!-- Botón Añadir a Carrito -->
+        <Button
+            android:id="@+id/btn_add_to_cart"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:text="🛒 Añadir a Carrito"
+            android:textColor="@android:color/white"
+            android:background="@drawable/rounded_button_purple"
+            android:textSize="14sp"
+            android:layout_marginBottom="12dp"
+            style="?android:attr/borderlessButtonStyle" />
+
+        <!-- Botón Cancelar -->
+        <Button
+            android:id="@+id/btn_cancel_dialog"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:text="Cancelar"
+            android:textColor="@android:color/darker_gray"
+            android:background="@drawable/rounded_button_transparent"
+            android:textSize="14sp"
+            style="?android:attr/borderlessButtonStyle" />
+
+    </LinearLayout>
+
+</LinearLayout>
