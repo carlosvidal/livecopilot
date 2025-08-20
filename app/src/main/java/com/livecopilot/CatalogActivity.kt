@@ -5,6 +5,8 @@ import android.content.Intent
 import android.graphics.Color
 import android.graphics.Rect
 import android.os.Bundle
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -24,6 +26,7 @@ class CatalogActivity : AppCompatActivity() {
     private lateinit var emptyView: TextView
     private lateinit var productManager: ProductManager
     private val products = mutableListOf<Product>()
+    private var selectionMode: Boolean = false
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,6 +40,7 @@ class CatalogActivity : AppCompatActivity() {
         toolbar.setBackgroundColor(ContextCompat.getColor(this, R.color.catalog_primary))
         toolbar.setTitleTextColor(Color.WHITE)
         toolbar.navigationIcon?.setTint(Color.WHITE)
+        toolbar.overflowIcon?.setTint(Color.WHITE)
         
         productManager = ProductManager(this)
         setupViews()
@@ -60,6 +64,59 @@ class CatalogActivity : AppCompatActivity() {
         fabAddProduct.setOnClickListener {
             openAddProduct()
         }
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(
+            if (selectionMode) R.menu.menu_favorites_selection else R.menu.menu_favorites,
+            menu
+        )
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_eliminar -> { enterSelectionMode(); true }
+            R.id.action_confirm_delete -> { confirmBatchDelete(); true }
+            android.R.id.home -> {
+                if (selectionMode) { exitSelectionMode(); true } else super.onOptionsItemSelected(item)
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
+    private fun enterSelectionMode() {
+        if (!selectionMode) {
+            selectionMode = true
+            adapter.setSelectionMode(true)
+            fabAddProduct.hide()
+            invalidateOptionsMenu()
+        }
+    }
+
+    private fun exitSelectionMode() {
+        if (selectionMode) {
+            selectionMode = false
+            adapter.setSelectionMode(false)
+            fabAddProduct.show()
+            invalidateOptionsMenu()
+        }
+    }
+
+    private fun confirmBatchDelete() {
+        val ids = adapter.getSelectedIds()
+        if (ids.isEmpty()) { exitSelectionMode(); return }
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Eliminar")
+            .setMessage("¿Eliminar ${'$'}{ids.size} producto(s)?")
+            .setNegativeButton("Cancelar", null)
+            .setPositiveButton("Eliminar") { dialog, _ ->
+                ids.forEach { id -> productManager.deleteProduct(id) }
+                loadProducts()
+                exitSelectionMode()
+                dialog.dismiss()
+            }
+            .show()
     }
 
     // ItemDecoration para espaciado uniforme
@@ -157,8 +214,9 @@ class CatalogActivity : AppCompatActivity() {
     }
     
     override fun onSupportNavigateUp(): Boolean {
-        finish()
-        return true
+        return if (selectionMode) {
+            exitSelectionMode(); true
+        } else { finish(); true }
     }
     
     companion object {

@@ -9,7 +9,10 @@ import android.graphics.Rect
 import android.content.res.Resources
 import android.os.Build
 import android.os.Bundle
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
+import android.view.ViewTreeObserver
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -17,7 +20,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
-import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.StaggeredGridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.RecyclerView.ItemDecoration
 import com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -39,6 +42,7 @@ class GalleryActivity : AppCompatActivity() {
     private lateinit var imageManager: ImageManager
     private val images = mutableListOf<GalleryImage>()
     private var selectedImageUri: Uri? = null
+    private var selectionMode: Boolean = false
     
     // ActivityResultLauncher para selección de imagen de galería
     private val imagePickerLauncher = registerForActivityResult(
@@ -94,6 +98,7 @@ class GalleryActivity : AppCompatActivity() {
         toolbar.setBackgroundColor(ContextCompat.getColor(this, R.color.gallery_primary))
         toolbar.setTitleTextColor(Color.WHITE)
         toolbar.navigationIcon?.setTint(Color.WHITE)
+        toolbar.overflowIcon?.setTint(Color.WHITE)
         
         imageManager = ImageManager(this)
         setupViews()
@@ -109,15 +114,86 @@ class GalleryActivity : AppCompatActivity() {
             shareImageFromActivity(image)
         }
         
-        // Grid fijo para rendimiento y scroll suave
-        recyclerView.layoutManager = GridLayoutManager(this, 3)
+        // Masonry con 2 columnas
+        val spanCount = 2
+        recyclerView.layoutManager = StaggeredGridLayoutManager(spanCount, StaggeredGridLayoutManager.VERTICAL)
         recyclerView.adapter = adapter
         recyclerView.setHasFixedSize(true)
-        recyclerView.addItemDecoration(GridSpacingItemDecoration(3, 8.dp(), includeEdge = true))
+        val spacing = 8.dp()
+        recyclerView.addItemDecoration(GridSpacingItemDecoration(spanCount, spacing, includeEdge = true))
+
+        // Calcular ancho de columna una vez que el RecyclerView tenga tamaño
+        recyclerView.viewTreeObserver.addOnGlobalLayoutListener(object : ViewTreeObserver.OnGlobalLayoutListener {
+            override fun onGlobalLayout() {
+                if (recyclerView.width > 0) {
+                    recyclerView.viewTreeObserver.removeOnGlobalLayoutListener(this)
+                    val totalSpace = recyclerView.width - spacing * (spanCount + 1)
+                    val columnWidth = totalSpace / spanCount
+                    adapter.setColumnWidth(columnWidth)
+                }
+            }
+        })
         
         fabAddImage.setOnClickListener {
             showImageSourceDialog()
         }
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(
+            if (selectionMode) R.menu.menu_favorites_selection else R.menu.menu_favorites,
+            menu
+        )
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_eliminar -> { enterSelectionMode(); true }
+            R.id.action_confirm_delete -> { confirmBatchDelete(); true }
+            android.R.id.home -> {
+                if (selectionMode) { exitSelectionMode(); true } else super.onOptionsItemSelected(item)
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
+    private fun enterSelectionMode() {
+        if (!selectionMode) {
+            selectionMode = true
+            adapter.setSelectionMode(true)
+            fabAddImage.hide()
+            invalidateOptionsMenu()
+        }
+    }
+
+    private fun exitSelectionMode() {
+        if (selectionMode) {
+            selectionMode = false
+            adapter.setSelectionMode(false)
+            fabAddImage.show()
+            invalidateOptionsMenu()
+        }
+    }
+
+    private fun confirmBatchDelete() {
+        val ids = adapter.getSelectedIds()
+        if (ids.isEmpty()) { exitSelectionMode(); return }
+        AlertDialog.Builder(this)
+            .setTitle("Eliminar")
+            .setMessage("¿Eliminar ${'$'}{ids.size} imagen(es)?")
+            .setNegativeButton("Cancelar", null)
+            .setPositiveButton("Eliminar") { dialog, _ ->
+                lifecycleScope.launch(Dispatchers.IO) {
+                    ids.forEach { id -> imageManager.deleteImage(id) }
+                    withContext(Dispatchers.Main) {
+                        loadImages()
+                        exitSelectionMode()
+                        dialog.dismiss()
+                    }
+                }
+            }
+            .show()
     }
     
     private fun loadImages() {
@@ -268,8 +344,9 @@ class GalleryActivity : AppCompatActivity() {
     }
     
     override fun onSupportNavigateUp(): Boolean {
-        finish()
-        return true
+        return if (selectionMode) {
+            exitSelectionMode(); true
+        } else { finish(); true }
     }
 }
 
