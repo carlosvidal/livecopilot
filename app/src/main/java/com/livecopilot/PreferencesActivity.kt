@@ -3,11 +3,13 @@ package com.livecopilot
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.graphics.Color
 import android.os.Build
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.Spinner
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import android.widget.Toast
 
 class PreferencesActivity : AppCompatActivity() {
@@ -19,9 +21,14 @@ class PreferencesActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_preferences)
 
-        setSupportActionBar(findViewById(R.id.toolbar))
+        val toolbar = findViewById<androidx.appcompat.widget.Toolbar>(R.id.toolbar)
+        setSupportActionBar(toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         supportActionBar?.title = "Preferencias"
+        // Color de encabezado igual al botón de Configuración
+        toolbar.setBackgroundColor(ContextCompat.getColor(this, R.color.settings_primary))
+        toolbar.setTitleTextColor(Color.WHITE)
+        toolbar.navigationIcon?.setTint(Color.WHITE)
 
         languageSpinner = findViewById(R.id.spinner_language)
         currencySpinner = findViewById(R.id.spinner_currency)

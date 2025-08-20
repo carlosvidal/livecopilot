@@ -4,9 +4,15 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.graphics.Color
+import android.graphics.Rect
+import android.content.res.Resources
 import android.os.Build
 import android.os.Bundle
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
+import android.view.ViewTreeObserver
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -16,10 +22,15 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.recyclerview.widget.StaggeredGridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.recyclerview.widget.RecyclerView.ItemDecoration
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.livecopilot.data.GalleryImage
 import com.livecopilot.data.ImageManager
 import com.livecopilot.utils.ImageUtils
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 class GalleryActivity : AppCompatActivity() {
@@ -31,6 +42,7 @@ class GalleryActivity : AppCompatActivity() {
     private lateinit var imageManager: ImageManager
     private val images = mutableListOf<GalleryImage>()
     private var selectedImageUri: Uri? = null
+    private var selectionMode: Boolean = false
     
     // ActivityResultLauncher para selección de imagen de galería
     private val imagePickerLauncher = registerForActivityResult(
@@ -78,9 +90,15 @@ class GalleryActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_gallery)
         
-        setSupportActionBar(findViewById(R.id.toolbar))
+        val toolbar = findViewById<androidx.appcompat.widget.Toolbar>(R.id.toolbar)
+        setSupportActionBar(toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         supportActionBar?.title = "Galería"
+        // Color de encabezado igual al botón de Galería
+        toolbar.setBackgroundColor(ContextCompat.getColor(this, R.color.gallery_primary))
+        toolbar.setTitleTextColor(Color.WHITE)
+        toolbar.navigationIcon?.setTint(Color.WHITE)
+        toolbar.overflowIcon?.setTint(Color.WHITE)
         
         imageManager = ImageManager(this)
         setupViews()
@@ -96,13 +114,86 @@ class GalleryActivity : AppCompatActivity() {
             shareImageFromActivity(image)
         }
         
-        // Usar StaggeredGridLayoutManager para layout masonry
-        recyclerView.layoutManager = StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL)
+        // Masonry con 2 columnas
+        val spanCount = 2
+        recyclerView.layoutManager = StaggeredGridLayoutManager(spanCount, StaggeredGridLayoutManager.VERTICAL)
         recyclerView.adapter = adapter
+        recyclerView.setHasFixedSize(true)
+        val spacing = 8.dp()
+        recyclerView.addItemDecoration(GridSpacingItemDecoration(spanCount, spacing, includeEdge = true))
+
+        // Calcular ancho de columna una vez que el RecyclerView tenga tamaño
+        recyclerView.viewTreeObserver.addOnGlobalLayoutListener(object : ViewTreeObserver.OnGlobalLayoutListener {
+            override fun onGlobalLayout() {
+                if (recyclerView.width > 0) {
+                    recyclerView.viewTreeObserver.removeOnGlobalLayoutListener(this)
+                    val totalSpace = recyclerView.width - spacing * (spanCount + 1)
+                    val columnWidth = totalSpace / spanCount
+                    adapter.setColumnWidth(columnWidth)
+                }
+            }
+        })
         
         fabAddImage.setOnClickListener {
             showImageSourceDialog()
         }
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(
+            if (selectionMode) R.menu.menu_favorites_selection else R.menu.menu_favorites,
+            menu
+        )
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_eliminar -> { enterSelectionMode(); true }
+            R.id.action_confirm_delete -> { confirmBatchDelete(); true }
+            android.R.id.home -> {
+                if (selectionMode) { exitSelectionMode(); true } else super.onOptionsItemSelected(item)
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
+    private fun enterSelectionMode() {
+        if (!selectionMode) {
+            selectionMode = true
+            adapter.setSelectionMode(true)
+            fabAddImage.hide()
+            invalidateOptionsMenu()
+        }
+    }
+
+    private fun exitSelectionMode() {
+        if (selectionMode) {
+            selectionMode = false
+            adapter.setSelectionMode(false)
+            fabAddImage.show()
+            invalidateOptionsMenu()
+        }
+    }
+
+    private fun confirmBatchDelete() {
+        val ids = adapter.getSelectedIds()
+        if (ids.isEmpty()) { exitSelectionMode(); return }
+        AlertDialog.Builder(this)
+            .setTitle("Eliminar")
+            .setMessage("¿Eliminar ${'$'}{ids.size} imagen(es)?")
+            .setNegativeButton("Cancelar", null)
+            .setPositiveButton("Eliminar") { dialog, _ ->
+                lifecycleScope.launch(Dispatchers.IO) {
+                    ids.forEach { id -> imageManager.deleteImage(id) }
+                    withContext(Dispatchers.Main) {
+                        loadImages()
+                        exitSelectionMode()
+                        dialog.dismiss()
+                    }
+                }
+            }
+            .show()
     }
     
     private fun loadImages() {
@@ -180,32 +271,40 @@ class GalleryActivity : AppCompatActivity() {
     }
     
     private fun addImageToGallery(uri: Uri) {
-        try {
-            // Copiar imagen al almacenamiento interno
-            val copiedPath = ImageUtils.copyImageToInternalStorage(this, uri)
-            
-            if (copiedPath != null) {
-                // Generar nombre automático basado en timestamp
-                val timestamp = System.currentTimeMillis()
-                val name = "Imagen_${java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", java.util.Locale.getDefault()).format(timestamp)}"
-                
-                val galleryImage = GalleryImage(
-                    name = name,
-                    imagePath = copiedPath,
-                    description = ""
-                )
-                
-                if (imageManager.addImage(galleryImage)) {
-                    Toast.makeText(this, "Imagen agregada a la galería", Toast.LENGTH_SHORT).show()
-                    loadImages() // Recargar la lista
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                // Copiar imagen al almacenamiento interno (IO)
+                val copiedPath = ImageUtils.copyImageToInternalStorage(this@GalleryActivity, uri)
+
+                if (copiedPath != null) {
+                    val timestamp = System.currentTimeMillis()
+                    val name = "Imagen_${java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", java.util.Locale.getDefault()).format(timestamp)}"
+
+                    val galleryImage = GalleryImage(
+                        name = name,
+                        imagePath = copiedPath,
+                        description = ""
+                    )
+
+                    val added = imageManager.addImage(galleryImage)
+                    withContext(Dispatchers.Main) {
+                        if (added) {
+                            Toast.makeText(this@GalleryActivity, "Imagen agregada a la galería", Toast.LENGTH_SHORT).show()
+                            loadImages()
+                        } else {
+                            Toast.makeText(this@GalleryActivity, "Error al agregar imagen", Toast.LENGTH_SHORT).show()
+                        }
+                    }
                 } else {
-                    Toast.makeText(this, "Error al agregar imagen", Toast.LENGTH_SHORT).show()
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@GalleryActivity, "Error al procesar imagen", Toast.LENGTH_SHORT).show()
+                    }
                 }
-            } else {
-                Toast.makeText(this, "Error al procesar imagen", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@GalleryActivity, "Error al agregar imagen", Toast.LENGTH_SHORT).show()
+                }
             }
-        } catch (e: Exception) {
-            Toast.makeText(this, "Error al agregar imagen", Toast.LENGTH_SHORT).show()
         }
     }
     
@@ -245,7 +344,32 @@ class GalleryActivity : AppCompatActivity() {
     }
     
     override fun onSupportNavigateUp(): Boolean {
-        finish()
-        return true
+        return if (selectionMode) {
+            exitSelectionMode(); true
+        } else { finish(); true }
     }
 }
+
+// ItemDecoration y helper de dp
+private class GridSpacingItemDecoration(
+    private val spanCount: Int,
+    private val spacing: Int,
+    private val includeEdge: Boolean
+) : RecyclerView.ItemDecoration() {
+    override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State) {
+        val position = parent.getChildAdapterPosition(view)
+        val column = position % spanCount
+        if (includeEdge) {
+            outRect.left = spacing - column * spacing / spanCount
+            outRect.right = (column + 1) * spacing / spanCount
+            if (position < spanCount) outRect.top = spacing
+            outRect.bottom = spacing
+        } else {
+            outRect.left = column * spacing / spanCount
+            outRect.right = spacing - (column + 1) * spacing / spanCount
+            if (position >= spanCount) outRect.top = spacing
+        }
+    }
+}
+
+private fun Int.dp(): Int = (this * Resources.getSystem().displayMetrics.density).toInt()

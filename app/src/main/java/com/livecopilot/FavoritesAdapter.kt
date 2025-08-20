@@ -4,6 +4,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.CheckBox
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.livecopilot.data.Favorite
@@ -15,10 +16,14 @@ class FavoritesAdapter(
     private val onLongClick: (Favorite) -> Unit
 ) : RecyclerView.Adapter<FavoritesAdapter.FavViewHolder>() {
 
+    private var selectionMode: Boolean = false
+    private val selectedIds = linkedSetOf<String>()
+
     class FavViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val icon: ImageView = view.findViewById(R.id.fav_icon)
         val name: TextView = view.findViewById(R.id.fav_name)
         val type: TextView = view.findViewById(R.id.fav_type)
+        val check: CheckBox = view.findViewById(R.id.fav_check)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): FavViewHolder {
@@ -45,7 +50,23 @@ class FavoritesAdapter(
         }
         holder.icon.setImageResource(iconRes)
 
-        holder.itemView.setOnClickListener { onClick(fav) }
+        // Selection UI
+        holder.check.visibility = if (selectionMode) View.VISIBLE else View.GONE
+        holder.check.setOnCheckedChangeListener(null)
+        holder.check.isChecked = selectedIds.contains(fav.id)
+        holder.check.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) selectedIds.add(fav.id) else selectedIds.remove(fav.id)
+        }
+
+        holder.itemView.setOnClickListener {
+            if (selectionMode) {
+                val nowChecked = !selectedIds.contains(fav.id)
+                if (nowChecked) selectedIds.add(fav.id) else selectedIds.remove(fav.id)
+                notifyItemChanged(position)
+            } else {
+                onClick(fav)
+            }
+        }
         holder.itemView.setOnLongClickListener {
             onLongClick(fav)
             true
@@ -57,6 +78,23 @@ class FavoritesAdapter(
     fun setData(newItems: List<Favorite>) {
         items.clear()
         items.addAll(newItems)
+        notifyDataSetChanged()
+    }
+
+    fun setSelectionMode(enabled: Boolean) {
+        if (selectionMode != enabled) {
+            selectionMode = enabled
+            if (!enabled) selectedIds.clear()
+            notifyDataSetChanged()
+        }
+    }
+
+    fun isSelectionMode(): Boolean = selectionMode
+
+    fun getSelectedIds(): List<String> = selectedIds.toList()
+
+    fun clearSelection() {
+        selectedIds.clear()
         notifyDataSetChanged()
     }
 }

@@ -40,4 +40,9 @@ dependencies {
     implementation 'com.google.code.gson:gson:2.10.1'
     // Jetpack DataStore for Preferences
     implementation 'androidx.datastore:datastore-preferences:1.0.0'
+    // Coil for async image loading and caching
+    implementation 'io.coil-kt:coil:2.6.0'
+    // Coroutines + lifecycle scope
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.7.0'
 }

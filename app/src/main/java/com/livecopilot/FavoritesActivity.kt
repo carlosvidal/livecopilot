@@ -5,24 +5,31 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuItem
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.livecopilot.data.Favorite
 import com.livecopilot.data.FavoriteType
 import com.livecopilot.data.FavoritesManager
 import android.util.Patterns
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 
 class FavoritesActivity : AppCompatActivity() {
 
     private lateinit var favoritesManager: FavoritesManager
     private lateinit var recycler: RecyclerView
     private lateinit var adapter: FavoritesAdapter
+    private var selectionMode: Boolean = false
+    private lateinit var fab: FloatingActionButton
     private var contentInputRef: EditText? = null
     private val pickDocument = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         uri ?: return@registerForActivityResult
@@ -37,9 +44,15 @@ class FavoritesActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_favorites)
 
-        setSupportActionBar(findViewById(R.id.toolbar))
+        val toolbar = findViewById<androidx.appcompat.widget.Toolbar>(R.id.toolbar)
+        setSupportActionBar(toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         supportActionBar?.title = "Favoritos"
+        // Color de encabezado igual al botón de Favoritos
+        toolbar.setBackgroundColor(ContextCompat.getColor(this, R.color.favorites_primary))
+        toolbar.setTitleTextColor(Color.WHITE)
+        toolbar.navigationIcon?.setTint(Color.WHITE)
+        toolbar.overflowIcon?.setTint(Color.WHITE)
 
         favoritesManager = FavoritesManager(this)
 
@@ -48,10 +61,74 @@ class FavoritesActivity : AppCompatActivity() {
         adapter = FavoritesAdapter(mutableListOf(), this::onFavoriteClick, this::onFavoriteLongClick)
         recycler.adapter = adapter
 
-        findViewById<com.google.android.material.floatingactionbutton.FloatingActionButton>(R.id.fab_add_favorite)
-            .setOnClickListener { showAddFavoriteDialog() }
+        fab = findViewById(R.id.fab_add_favorite)
+        fab.setOnClickListener { showAddFavoriteDialog() }
 
         loadFavorites()
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(
+            if (selectionMode) R.menu.menu_favorites_selection else R.menu.menu_favorites,
+            menu
+        )
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_eliminar -> {
+                enterSelectionMode()
+                true
+            }
+            R.id.action_confirm_delete -> {
+                confirmBatchDelete()
+                true
+            }
+            android.R.id.home -> {
+                if (selectionMode) {
+                    exitSelectionMode()
+                    true
+                } else super.onOptionsItemSelected(item)
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
+    private fun enterSelectionMode() {
+        if (!selectionMode) {
+            selectionMode = true
+            adapter.setSelectionMode(true)
+            fab.hide()
+            invalidateOptionsMenu()
+        }
+    }
+
+    private fun exitSelectionMode() {
+        if (selectionMode) {
+            selectionMode = false
+            adapter.setSelectionMode(false)
+            fab.show()
+            invalidateOptionsMenu()
+        }
+    }
+
+    private fun confirmBatchDelete() {
+        val ids = adapter.getSelectedIds()
+        if (ids.isEmpty()) {
+            exitSelectionMode()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Eliminar")
+            .setMessage("¿Eliminar ${'$'}{ids.size} favorito(s)?")
+            .setNegativeButton("Cancelar", null)
+            .setPositiveButton("Eliminar") { _, _ ->
+                ids.forEach { id -> favoritesManager.delete(id) }
+                loadFavorites()
+                exitSelectionMode()
+            }
+            .show()
     }
 
     private fun loadFavorites() {
@@ -139,12 +216,8 @@ class FavoritesActivity : AppCompatActivity() {
     }
 
     private fun onFavoriteClick(fav: Favorite) {
-        when (fav.type) {
-            FavoriteType.LINK -> openLink(fav.content)
-            FavoriteType.PDF -> openOrShare("application/pdf", fav.content)
-            FavoriteType.IMAGE -> openOrShare("image/*", fav.content)
-            FavoriteType.TEXT -> shareText(fav.content)
-        }
+        // En la pantalla de Favoritos (no el modal), un tap debe abrir el formulario de edición
+        showEditFavoriteDialog(fav)
     }
 
     private fun onFavoriteLongClick(fav: Favorite) {
@@ -340,7 +413,12 @@ class FavoritesActivity : AppCompatActivity() {
     }
 
     override fun onSupportNavigateUp(): Boolean {
-        finish()
-        return true
+        return if (selectionMode) {
+            exitSelectionMode()
+            true
+        } else {
+            finish()
+            true
+        }
     }
 }
