@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import com.livecopilot.utils.ImageUtils
 import java.util.UUID
 
 class ProductManager(private val context: Context) {
@@ -12,21 +13,14 @@ class ProductManager(private val context: Context) {
         context.getSharedPreferences("livecopilot_products", Context.MODE_PRIVATE) 
     }
     private val gson by lazy { Gson() }
+    private val planManager by lazy { PlanManager(context) }
     
     companion object {
         private const val KEY_PRODUCTS = "products"
-        private const val KEY_IS_PREMIUM = "is_premium"
         private const val MAX_FREE_PRODUCTS = 24
     }
     
-    // Por ahora, todos los usuarios son gratuitos
-    fun isPremium(): Boolean {
-        return prefs.getBoolean(KEY_IS_PREMIUM, false)
-    }
-    
-    fun setPremium(premium: Boolean) {
-        prefs.edit().putBoolean(KEY_IS_PREMIUM, premium).apply()
-    }
+    fun isPremium(): Boolean = planManager.isPro()
     
     fun getAllProducts(): List<Product> {
         val json = prefs.getString(KEY_PRODUCTS, null) ?: return emptyList()
@@ -60,19 +54,29 @@ class ProductManager(private val context: Context) {
         
         if (index == -1) return false
         
+        val old = products[index]
         products[index] = product
         saveProducts(products)
+        
+        // Si cambió la imagen, eliminar archivo anterior
+        if (old.imageUri.isNotEmpty() && old.imageUri != product.imageUri) {
+            ImageUtils.deleteImage(old.imageUri)
+        }
+        
         return true
     }
     
     fun deleteProduct(productId: String): Boolean {
         val products = getAllProducts().toMutableList()
+        val toDelete = products.find { it.id == productId }
         val removed = products.removeAll { it.id == productId }
-        
         if (removed) {
             saveProducts(products)
+            // Eliminar archivo de imagen del producto eliminado
+            toDelete?.imageUri?.takeIf { it.isNotEmpty() }?.let { ImageUtils.deleteImage(it) }
+            // Limpieza de huérfanas en directorio interno
+            cleanupOrphanImages()
         }
-        
         return removed
     }
     
@@ -96,6 +100,11 @@ class ProductManager(private val context: Context) {
     private fun saveProducts(products: List<Product>) {
         val json = gson.toJson(products)
         prefs.edit().putString(KEY_PRODUCTS, json).apply()
+    }
+
+    private fun cleanupOrphanImages() {
+        val used = getAllProducts().mapNotNull { it.imageUri.takeIf { uri -> uri.isNotEmpty() } }
+        ImageUtils.cleanupUnusedImages(context, used)
     }
     
     enum class AddProductResult {

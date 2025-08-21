@@ -15,6 +15,7 @@ import android.view.View
 import android.view.ViewTreeObserver
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -26,6 +27,7 @@ import androidx.recyclerview.widget.RecyclerView.ItemDecoration
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.livecopilot.data.GalleryImage
 import com.livecopilot.data.ImageManager
+import com.livecopilot.data.ImageManager.AddImageResult
 import com.livecopilot.utils.ImageUtils
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
@@ -44,13 +46,16 @@ class GalleryActivity : AppCompatActivity() {
     private var selectedImageUri: Uri? = null
     private var selectionMode: Boolean = false
     
-    // ActivityResultLauncher para selección de imagen de galería
+    // Photo Picker (API 33+) y fallback a GetContent
     private val imagePickerLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri ->
-        uri?.let {
-            addImageToGallery(it)
-        }
+        uri?.let { addImageToGallery(it) }
+    }
+    private val photoPickerLauncher = registerForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        uri?.let { addImageToGallery(it) }
     }
     
     // ActivityResultLauncher para tomar foto con cámara
@@ -119,6 +124,7 @@ class GalleryActivity : AppCompatActivity() {
         recyclerView.layoutManager = StaggeredGridLayoutManager(spanCount, StaggeredGridLayoutManager.VERTICAL)
         recyclerView.adapter = adapter
         recyclerView.setHasFixedSize(true)
+        recyclerView.setItemViewCacheSize(20)
         val spacing = 8.dp()
         recyclerView.addItemDecoration(GridSpacingItemDecoration(spanCount, spacing, includeEdge = true))
 
@@ -135,7 +141,11 @@ class GalleryActivity : AppCompatActivity() {
         })
         
         fabAddImage.setOnClickListener {
-            showImageSourceDialog()
+            if (!imageManager.canAddMoreImages()) {
+                showLimitDialogImages()
+            } else {
+                showImageSourceDialog()
+            }
         }
     }
 
@@ -254,12 +264,12 @@ class GalleryActivity : AppCompatActivity() {
     }
     
     private fun openGallery() {
-        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Manifest.permission.READ_MEDIA_IMAGES
-        } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Photo Picker no requiere permisos en Android 13+
+            photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            return
         }
-        
+        val permission = Manifest.permission.READ_EXTERNAL_STORAGE
         when {
             ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED -> {
                 imagePickerLauncher.launch("image/*")
@@ -286,13 +296,19 @@ class GalleryActivity : AppCompatActivity() {
                         description = ""
                     )
 
-                    val added = imageManager.addImage(galleryImage)
+                    val result = imageManager.addImage(galleryImage)
                     withContext(Dispatchers.Main) {
-                        if (added) {
-                            Toast.makeText(this@GalleryActivity, "Imagen agregada a la galería", Toast.LENGTH_SHORT).show()
-                            loadImages()
-                        } else {
-                            Toast.makeText(this@GalleryActivity, "Error al agregar imagen", Toast.LENGTH_SHORT).show()
+                        when (result) {
+                            AddImageResult.SUCCESS -> {
+                                Toast.makeText(this@GalleryActivity, "Imagen agregada a la galería", Toast.LENGTH_SHORT).show()
+                                loadImages()
+                            }
+                            AddImageResult.LIMIT_REACHED -> {
+                                showLimitDialogImages()
+                            }
+                            AddImageResult.ERROR -> {
+                                Toast.makeText(this@GalleryActivity, "Error al agregar imagen", Toast.LENGTH_SHORT).show()
+                            }
                         }
                     }
                 } else {
@@ -306,6 +322,14 @@ class GalleryActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun showLimitDialogImages() {
+        AlertDialog.Builder(this)
+            .setTitle("Límite alcanzado")
+            .setMessage("Has alcanzado el límite de 24 imágenes en el plan Free.\n\nActiva Pro en Preferencias para agregar ilimitadas.")
+            .setPositiveButton("OK", null)
+            .show()
     }
     
     private fun shareImageFromActivity(image: GalleryImage) {

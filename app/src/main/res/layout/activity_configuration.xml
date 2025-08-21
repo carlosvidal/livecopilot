@@ -18,12 +18,48 @@
 
     </com.google.android.material.appbar.AppBarLayout>
 
-    <TextView
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:gravity="center"
-        android:text="Configuración\n\nAquí se mostrarán las opciones de configuración"
-        android:textSize="18sp"
-        android:textColor="?android:attr/textColorSecondary" />
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:id="@+id/text_plan_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Plan actual: Free (24 ítems)"
+            android:textSize="16sp"
+            android:textColor="?android:attr/textColorPrimary" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingTop="12dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Activar Pro"
+                android:textSize="16sp" />
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/switch_plan"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Free: hasta 24 productos, 24 imágenes y 24 favoritos.\nPro: ilimitado."
+            android:textSize="14sp"
+            android:paddingTop="8dp"
+            android:textColor="?android:attr/textColorSecondary" />
+
+    </LinearLayout>
 
 </LinearLayout>

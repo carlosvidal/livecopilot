@@ -14,6 +14,7 @@ import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -43,9 +44,17 @@ class AddProductActivity : AppCompatActivity() {
     private var selectedImageUri: Uri? = null
     private var copiedImagePath: String? = null // Ruta de la imagen copiada al almacenamiento interno
     
-    // ActivityResultLauncher para selección de imagen de galería
+    // Photo Picker (API 33+) y fallback a GetContent
     private val imagePickerLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            selectedImageUri = it
+            copyImageToInternalStorage()
+        }
+    }
+    private val photoPickerLauncher = registerForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         uri?.let {
             selectedImageUri = it
@@ -192,12 +201,12 @@ class AddProductActivity : AppCompatActivity() {
     }
     
     private fun openGallery() {
-        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Manifest.permission.READ_MEDIA_IMAGES
-        } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Photo Picker no requiere permisos en Android 13+
+            photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            return
         }
-        
+        val permission = Manifest.permission.READ_EXTERNAL_STORAGE
         when {
             ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED -> {
                 imagePickerLauncher.launch("image/*")
