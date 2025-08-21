@@ -19,18 +19,25 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.livecopilot.data.Favorite
 import com.livecopilot.data.FavoriteType
-import com.livecopilot.data.FavoritesManager
+// Removed legacy FavoritesManager usage; now Room-based
 import android.util.Patterns
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.launch
+import com.livecopilot.data.repository.FavoriteGenericRepository
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.livecopilot.data.PlanManager
 
 class FavoritesActivity : AppCompatActivity() {
 
-    private lateinit var favoritesManager: FavoritesManager
+    private lateinit var favoriteRepo: FavoriteGenericRepository
     private lateinit var recycler: RecyclerView
     private lateinit var adapter: FavoritesAdapter
     private var selectionMode: Boolean = false
     private lateinit var fab: FloatingActionButton
     private var contentInputRef: EditText? = null
+    private lateinit var planManager: PlanManager
     private val pickDocument = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         uri ?: return@registerForActivityResult
         try {
@@ -38,6 +45,14 @@ class FavoritesActivity : AppCompatActivity() {
             contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
         } catch (_: Exception) { }
         contentInputRef?.setText(uri.toString())
+    }
+
+    private fun showLimitDialogFavorites() {
+        AlertDialog.Builder(this)
+            .setTitle("Límite alcanzado")
+            .setMessage("Has alcanzado el límite de 24 favoritos en el plan Free.\n\nActiva Pro en Preferencias para agregar ilimitados.")
+            .setPositiveButton("OK", null)
+            .show()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,7 +69,8 @@ class FavoritesActivity : AppCompatActivity() {
         toolbar.navigationIcon?.setTint(Color.WHITE)
         toolbar.overflowIcon?.setTint(Color.WHITE)
 
-        favoritesManager = FavoritesManager(this)
+        favoriteRepo = FavoriteGenericRepository(this)
+        planManager = PlanManager(this)
 
         recycler = findViewById(R.id.favorites_recycler)
         recycler.layoutManager = LinearLayoutManager(this)
@@ -62,9 +78,15 @@ class FavoritesActivity : AppCompatActivity() {
         recycler.adapter = adapter
 
         fab = findViewById(R.id.fab_add_favorite)
-        fab.setOnClickListener { showAddFavoriteDialog() }
+        fab.setOnClickListener {
+            if (!canAddMoreFavorites()) {
+                showLimitDialogFavorites()
+            } else {
+                showAddFavoriteDialog()
+            }
+        }
 
-        loadFavorites()
+        observeRoomFavorites()
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -124,15 +146,40 @@ class FavoritesActivity : AppCompatActivity() {
             .setMessage("¿Eliminar ${'$'}{ids.size} favorito(s)?")
             .setNegativeButton("Cancelar", null)
             .setPositiveButton("Eliminar") { _, _ ->
-                ids.forEach { id -> favoritesManager.delete(id) }
-                loadFavorites()
-                exitSelectionMode()
+                lifecycleScope.launch {
+                    ids.forEach { id -> runCatching { favoriteRepo.delete(id) } }
+                    exitSelectionMode()
+                }
             }
             .show()
     }
 
-    private fun loadFavorites() {
-        adapter.setData(favoritesManager.getAll())
+    private val currentFavorites = mutableListOf<Favorite>()
+
+    private fun canAddMoreFavorites(): Boolean {
+        return planManager.isPro() || currentFavorites.size < PlanManager.MAX_FREE_ITEMS
+    }
+
+    private fun observeRoomFavorites() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                favoriteRepo.observeAll().collect { entities ->
+                    val list = entities.mapNotNull { e ->
+                        runCatching {
+                            Favorite(
+                                id = e.id,
+                                type = FavoriteType.valueOf(e.type),
+                                name = e.name,
+                                content = e.content
+                            )
+                        }.getOrNull()
+                    }
+                    currentFavorites.clear()
+                    currentFavorites.addAll(list)
+                    adapter.setData(list)
+                }
+            }
+        }
     }
 
     private fun showAddFavoriteDialog() {
@@ -180,6 +227,10 @@ class FavoritesActivity : AppCompatActivity() {
         dialog.setOnShowListener {
             val btnSave = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
             btnSave.setOnClickListener {
+                if (!canAddMoreFavorites()) {
+                    showLimitDialogFavorites()
+                    return@setOnClickListener
+                }
                 nameInput.error = null
                 contentInput.error = null
 
@@ -198,9 +249,21 @@ class FavoritesActivity : AppCompatActivity() {
                 }
 
                 val type = spinnerSelectionToType(typeIndex)
-                favoritesManager.add(type, name, content)
-                loadFavorites()
-                dialog.dismiss()
+                // Persist to Room
+                lifecycleScope.launch {
+                    runCatching {
+                        favoriteRepo.upsert(
+                            com.livecopilot.data.local.entity.FavoriteGenericEntity(
+                                id = java.util.UUID.randomUUID().toString(),
+                                type = type.name,
+                                name = name,
+                                content = content,
+                                createdAt = System.currentTimeMillis()
+                            )
+                        )
+                    }
+                    dialog.dismiss()
+                }
             }
         }
 
@@ -240,8 +303,7 @@ class FavoritesActivity : AppCompatActivity() {
             .setMessage("¿Eliminar '${fav.name}'?")
             .setNegativeButton("Cancelar", null)
             .setPositiveButton("Eliminar") { _, _ ->
-                favoritesManager.delete(fav.id)
-                loadFavorites()
+                lifecycleScope.launch { runCatching { favoriteRepo.delete(fav.id) } }
             }
             .show()
     }
@@ -317,9 +379,12 @@ class FavoritesActivity : AppCompatActivity() {
                 }
 
                 val type = spinnerSelectionToType(typeIndex)
-                favoritesManager.update(fav.copy(type = type, name = name, content = content))
-                loadFavorites()
-                dialog.dismiss()
+                lifecycleScope.launch {
+                    runCatching {
+                        favoriteRepo.update(fav.id, type.name, name, content)
+                    }
+                    dialog.dismiss()
+                }
             }
         }
         dialog.setOnDismissListener { contentInputRef = null }
@@ -330,7 +395,7 @@ class FavoritesActivity : AppCompatActivity() {
         if (name.isBlank() || content.isBlank()) return "Completa nombre y contenido"
 
         // Duplicados por nombre (case-insensitive)
-        val duplicated = favoritesManager.getAll().any { it.name.equals(name, ignoreCase = true) && it.id != excludeId }
+        val duplicated = currentFavorites.any { it.name.equals(name, ignoreCase = true) && it.id != excludeId }
         if (duplicated) return "Ya existe un favorito con ese nombre"
 
         return when (typeIndex) {

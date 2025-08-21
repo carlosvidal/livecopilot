@@ -15,6 +15,7 @@ import android.view.View
 import android.view.ViewTreeObserver
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -25,13 +26,17 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.RecyclerView.ItemDecoration
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.livecopilot.data.GalleryImage
-import com.livecopilot.data.ImageManager
 import com.livecopilot.utils.ImageUtils
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import com.livecopilot.data.repository.GalleryImageRepository
+import com.livecopilot.data.local.entity.GalleryImageEntity
+import com.livecopilot.data.PlanManager
 
 class GalleryActivity : AppCompatActivity() {
     
@@ -39,18 +44,22 @@ class GalleryActivity : AppCompatActivity() {
     private lateinit var adapter: GalleryAdapter
     private lateinit var emptyView: TextView
     private lateinit var fabAddImage: FloatingActionButton
-    private lateinit var imageManager: ImageManager
+    private lateinit var imageRepo: GalleryImageRepository
+    private lateinit var planManager: PlanManager
     private val images = mutableListOf<GalleryImage>()
     private var selectedImageUri: Uri? = null
     private var selectionMode: Boolean = false
     
-    // ActivityResultLauncher para selección de imagen de galería
+    // Photo Picker (API 33+) y fallback a GetContent
     private val imagePickerLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri ->
-        uri?.let {
-            addImageToGallery(it)
-        }
+        uri?.let { addImageToGallery(it) }
+    }
+    private val photoPickerLauncher = registerForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        uri?.let { addImageToGallery(it) }
     }
     
     // ActivityResultLauncher para tomar foto con cámara
@@ -100,9 +109,10 @@ class GalleryActivity : AppCompatActivity() {
         toolbar.navigationIcon?.setTint(Color.WHITE)
         toolbar.overflowIcon?.setTint(Color.WHITE)
         
-        imageManager = ImageManager(this)
+        imageRepo = GalleryImageRepository(this)
+        planManager = PlanManager(this)
         setupViews()
-        loadImages()
+        observeRoomImages()
     }
     
     private fun setupViews() {
@@ -119,6 +129,7 @@ class GalleryActivity : AppCompatActivity() {
         recyclerView.layoutManager = StaggeredGridLayoutManager(spanCount, StaggeredGridLayoutManager.VERTICAL)
         recyclerView.adapter = adapter
         recyclerView.setHasFixedSize(true)
+        recyclerView.setItemViewCacheSize(20)
         val spacing = 8.dp()
         recyclerView.addItemDecoration(GridSpacingItemDecoration(spanCount, spacing, includeEdge = true))
 
@@ -135,8 +146,16 @@ class GalleryActivity : AppCompatActivity() {
         })
         
         fabAddImage.setOnClickListener {
-            showImageSourceDialog()
+            if (!canAddMoreImages()) {
+                showLimitDialogImages()
+            } else {
+                showImageSourceDialog()
+            }
         }
+    }
+
+    private fun canAddMoreImages(): Boolean {
+        return planManager.isPro() || images.size < PlanManager.MAX_FREE_ITEMS
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -185,27 +204,43 @@ class GalleryActivity : AppCompatActivity() {
             .setNegativeButton("Cancelar", null)
             .setPositiveButton("Eliminar") { dialog, _ ->
                 lifecycleScope.launch(Dispatchers.IO) {
-                    ids.forEach { id -> imageManager.deleteImage(id) }
-                    withContext(Dispatchers.Main) {
-                        loadImages()
-                        exitSelectionMode()
-                        dialog.dismiss()
+                    ids.forEach { id ->
+                        // delete file then DB row
+                        val img = images.find { it.id == id }
+                        img?.imagePath?.let { runCatching { ImageUtils.deleteImage(it) } }
+                        runCatching { imageRepo.delete(id) }
                     }
+                    withContext(Dispatchers.Main) { exitSelectionMode(); dialog.dismiss() }
                 }
             }
             .show()
     }
     
-    private fun loadImages() {
-        val allImages = imageManager.getAllImages()
-        
-        if (allImages.isEmpty()) {
-            recyclerView.visibility = View.GONE
-            emptyView.visibility = View.VISIBLE
-        } else {
-            recyclerView.visibility = View.VISIBLE
-            emptyView.visibility = View.GONE
-            adapter.updateImages(allImages)
+    private fun observeRoomImages() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                imageRepo.observeAll().collect { entities ->
+                    val list = entities.map { e ->
+                        GalleryImage(
+                            id = e.id,
+                            name = e.name,
+                            imagePath = e.imagePath,
+                            description = e.description,
+                            dateAdded = e.dateAdded
+                        )
+                    }
+                    images.clear()
+                    images.addAll(list)
+                    if (list.isEmpty()) {
+                        recyclerView.visibility = View.GONE
+                        emptyView.visibility = View.VISIBLE
+                    } else {
+                        recyclerView.visibility = View.VISIBLE
+                        emptyView.visibility = View.GONE
+                        adapter.updateImages(list)
+                    }
+                }
+            }
         }
     }
     
@@ -254,12 +289,12 @@ class GalleryActivity : AppCompatActivity() {
     }
     
     private fun openGallery() {
-        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Manifest.permission.READ_MEDIA_IMAGES
-        } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Photo Picker no requiere permisos en Android 13+
+            photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            return
         }
-        
+        val permission = Manifest.permission.READ_EXTERNAL_STORAGE
         when {
             ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED -> {
                 imagePickerLauncher.launch("image/*")
@@ -278,20 +313,31 @@ class GalleryActivity : AppCompatActivity() {
 
                 if (copiedPath != null) {
                     val timestamp = System.currentTimeMillis()
-                    val name = "Imagen_${java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", java.util.Locale.getDefault()).format(timestamp)}"
+                    val sdf = java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", java.util.Locale.getDefault())
+                    val name = "Imagen_${'$'}{sdf.format(timestamp)}"
 
-                    val galleryImage = GalleryImage(
-                        name = name,
-                        imagePath = copiedPath,
-                        description = ""
-                    )
+                    // Enforce plan limit
+                    if (!canAddMoreImages()) {
+                        withContext(Dispatchers.Main) { showLimitDialogImages() }
+                        return@launch
+                    }
 
-                    val added = imageManager.addImage(galleryImage)
-                    withContext(Dispatchers.Main) {
-                        if (added) {
+                    runCatching {
+                        imageRepo.upsert(
+                            GalleryImageEntity(
+                                id = java.util.UUID.randomUUID().toString(),
+                                name = name,
+                                imagePath = copiedPath,
+                                description = "",
+                                dateAdded = timestamp
+                            )
+                        )
+                    }.onSuccess {
+                        withContext(Dispatchers.Main) {
                             Toast.makeText(this@GalleryActivity, "Imagen agregada a la galería", Toast.LENGTH_SHORT).show()
-                            loadImages()
-                        } else {
+                        }
+                    }.onFailure {
+                        withContext(Dispatchers.Main) {
                             Toast.makeText(this@GalleryActivity, "Error al agregar imagen", Toast.LENGTH_SHORT).show()
                         }
                     }
@@ -306,6 +352,14 @@ class GalleryActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun showLimitDialogImages() {
+        AlertDialog.Builder(this)
+            .setTitle("Límite alcanzado")
+            .setMessage("Has alcanzado el límite de 24 imágenes en el plan Free.\n\nActiva Pro en Preferencias para agregar ilimitadas.")
+            .setPositiveButton("OK", null)
+            .show()
     }
     
     private fun shareImageFromActivity(image: GalleryImage) {
@@ -340,7 +394,7 @@ class GalleryActivity : AppCompatActivity() {
     
     override fun onResume() {
         super.onResume()
-        loadImages() // Recargar imágenes cuando se vuelve a la actividad
+        // Observers already active with repeatOnLifecycle
     }
     
     override fun onSupportNavigateUp(): Boolean {

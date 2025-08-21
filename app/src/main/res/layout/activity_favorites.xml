@@ -33,7 +33,9 @@
         android:layout_gravity="end|bottom"
         android:layout_margin="16dp"
         app:srcCompat="@drawable/ic_add"
-        app:backgroundTint="?attr/colorPrimary"
-        app:tint="?attr/colorOnPrimary" />
+        app:backgroundTint="@color/favorites_primary"
+        app:tint="@android:color/white"
+        android:backgroundTint="@color/favorites_primary"
+        android:tint="@android:color/white" />
 
 </LinearLayout>

@@ -10,6 +10,8 @@
     <!-- Toolbar colors to match main buttons -->
     <color name="catalog_primary">#2196F3</color>
     <color name="gallery_primary">#4CAF50</color>
-    <color name="favorites_primary">#FF9800</color>
+    <color name="favorites_primary">#F44336</color>
     <color name="settings_primary">#FF5722</color>
+    <!-- Overlay bubble/menu colors -->
+    <color name="bubble_teal">#00838F</color>
 </resources>

@@ -10,6 +10,7 @@ import com.livecopilot.data.GalleryImage
 import com.livecopilot.utils.ImageUtils
 import coil.load
 import android.graphics.BitmapFactory
+import android.graphics.Bitmap
 
 class GalleryAdapter(
     private val images: MutableList<GalleryImage>,
@@ -35,6 +36,7 @@ class GalleryAdapter(
         val image = images[position]
 
         // Calcular altura objetivo según aspect ratio si tenemos columnWidth
+        var targetH: Int? = null
         if (columnWidth > 0) {
             try {
                 val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -42,9 +44,9 @@ class GalleryAdapter(
                 val srcW = opts.outWidth
                 val srcH = opts.outHeight
                 if (srcW > 0 && srcH > 0) {
-                    val targetH = (srcH.toFloat() / srcW.toFloat() * columnWidth).toInt().coerceAtLeast(1)
+                    targetH = (srcH.toFloat() / srcW.toFloat() * columnWidth).toInt().coerceAtLeast(1)
                     val lp = holder.imageView.layoutParams
-                    lp.height = targetH
+                    lp.height = targetH!!
                     holder.imageView.layoutParams = lp
                 }
             } catch (_: Exception) { /* ignore and let Coil size it */ }
@@ -59,6 +61,9 @@ class GalleryAdapter(
                     crossfade(true)
                     placeholder(R.drawable.ic_image)
                     error(R.drawable.ic_image)
+                    targetH?.let { size(columnWidth, it) }
+                    allowHardware(true)
+                    bitmapConfig(Bitmap.Config.RGB_565)
                 }
             } else {
                 holder.imageView.setImageResource(R.drawable.ic_image)
