@@ -15,12 +15,19 @@ import androidx.appcompat.widget.SwitchCompat
 import android.widget.TextView
 import com.livecopilot.data.Plan
 import com.livecopilot.data.PlanManager
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import com.livecopilot.data.repository.PreferencesRepository
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collect
 
 class PreferencesActivity : AppCompatActivity() {
 
     private lateinit var languageSpinner: Spinner
     private lateinit var currencySpinner: Spinner
     private lateinit var planManager: PlanManager
+    private lateinit var prefsRepo: PreferencesRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,6 +43,7 @@ class PreferencesActivity : AppCompatActivity() {
         toolbar.navigationIcon?.setTint(Color.WHITE)
 
         planManager = PlanManager(this)
+        prefsRepo = PreferencesRepository(this)
 
         languageSpinner = findViewById(R.id.spinner_language)
         currencySpinner = findViewById(R.id.spinner_currency)
@@ -57,8 +65,9 @@ class PreferencesActivity : AppCompatActivity() {
         ).also { it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
         currencySpinner.adapter = currAdapter
 
-        // Load existing values
+        // Load existing values (fallback to SharedPreferences), then start observing Room
         loadPreferences()
+        observeRoomPreferences()
 
         // Init plan UI
         fun refreshLabel() {
@@ -103,6 +112,36 @@ class PreferencesActivity : AppCompatActivity() {
         if (currIndex >= 0) currencySpinner.setSelection(currIndex)
     }
 
+    private fun observeRoomPreferences() {
+        val langValues = resources.getStringArray(R.array.pref_languages_values)
+        val currValues = resources.getStringArray(R.array.pref_currencies_values)
+
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                // Language
+                launch {
+                    prefsRepo.observe("pref_language").collect { entity ->
+                        val v = entity?.value ?: return@collect
+                        val idx = langValues.indexOf(v)
+                        if (idx >= 0 && languageSpinner.selectedItemPosition != idx) {
+                            languageSpinner.setSelection(idx)
+                        }
+                    }
+                }
+                // Currency
+                launch {
+                    prefsRepo.observe("pref_currency").collect { entity ->
+                        val v = entity?.value ?: return@collect
+                        val idx = currValues.indexOf(v)
+                        if (idx >= 0 && currencySpinner.selectedItemPosition != idx) {
+                            currencySpinner.setSelection(idx)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private fun savePreferences() {
         val langValues = resources.getStringArray(R.array.pref_languages_values)
         val currValues = resources.getStringArray(R.array.pref_currencies_values)
@@ -114,6 +153,15 @@ class PreferencesActivity : AppCompatActivity() {
         prefs.putString("pref_language", selectedLang)
         prefs.putString("pref_currency", selectedCurr)
         prefs.apply()
+
+        // Persist into Room (idempotent) without blocking UI
+        lifecycleScope.launch {
+            runCatching {
+                val repo = PreferencesRepository(this@PreferencesActivity)
+                repo.set("pref_language", selectedLang)
+                repo.set("pref_currency", selectedCurr)
+            }
+        }
     }
 
     private fun restartOverlayService() {

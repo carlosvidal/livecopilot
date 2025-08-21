@@ -4,27 +4,26 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
-import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.livecopilot.data.GalleryImage
 import com.livecopilot.utils.ImageUtils
 
-class GalleryModalAdapter(
+class GalleryOverlayAdapter(
     private val images: MutableList<GalleryImage>,
     private val onImageClick: (GalleryImage) -> Unit
-) : RecyclerView.Adapter<GalleryModalAdapter.GalleryModalViewHolder>() {
+) : RecyclerView.Adapter<GalleryOverlayAdapter.GalleryOverlayViewHolder>() {
 
-    class GalleryModalViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+    class GalleryOverlayViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val imageView: ImageView = view.findViewById(R.id.gallery_modal_image)
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): GalleryModalViewHolder {
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): GalleryOverlayViewHolder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_gallery_modal, parent, false)
-        return GalleryModalViewHolder(view)
+        return GalleryOverlayViewHolder(view)
     }
 
-    override fun onBindViewHolder(holder: GalleryModalViewHolder, position: Int) {
+    override fun onBindViewHolder(holder: GalleryOverlayViewHolder, position: Int) {
         val image = images[position]
         
         // Cargar imagen

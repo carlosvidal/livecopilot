@@ -30,13 +30,24 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.content.FileProvider
+import android.util.Log
 import com.livecopilot.data.Product
 import com.livecopilot.data.ProductManager
-import com.livecopilot.data.CartManager
-import com.livecopilot.data.ImageManager
+import com.livecopilot.data.CartItem
+import com.livecopilot.data.repository.CartRepository
 import com.livecopilot.data.GalleryImage
+import com.livecopilot.data.repository.GalleryImageRepository
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancel
 import com.livecopilot.utils.ImageUtils
-import com.livecopilot.data.FavoritesManager
+import com.livecopilot.data.repository.FavoriteGenericRepository
 import com.livecopilot.data.Favorite
 import com.livecopilot.data.FavoriteType
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -47,6 +58,10 @@ import java.io.File
 import com.livecopilot.util.CurrencyUtils
 
 class OverlayService : Service() {
+    companion object {
+        private const val TAG = "OverlayService"
+        const val ACTION_SHOW_BUBBLE = "SHOW_BUBBLE"
+    }
     private lateinit var windowManager: WindowManager
     private lateinit var bubbleView: View
     private lateinit var fanView: View
@@ -70,6 +85,34 @@ class OverlayService : Service() {
     enum class BubbleState {
         COLLAPSED, FAN, CATALOG, PRODUCTS_CATALOG, SHARE_DIALOG, GALLERY, CART, FAVORITES
     }
+
+    private fun migrateLegacyCartIfNeeded() {
+        val prefs = getSharedPreferences("livecopilot_cart", Context.MODE_PRIVATE)
+        val migratedKey = "migrated_to_room"
+        if (prefs.getBoolean(migratedKey, false)) return
+
+        try {
+            val json = prefs.getString("cart_items", "[]")
+            val type = object : TypeToken<List<CartItem>>() {}.type
+            val items: List<CartItem> = try { Gson().fromJson(json, type) ?: emptyList() } catch (e: Exception) { emptyList() }
+            Log.d(TAG, "migrateLegacyCartIfNeeded: found ${items.size} items")
+            if (items.isNotEmpty()) {
+                serviceScope.launch {
+                    items.forEach { item ->
+                        cartRepository.upsert(item.product, item.quantity)
+                    }
+                    // Clear legacy data and mark migrated
+                    prefs.edit().remove("cart_items").putBoolean(migratedKey, true).apply()
+                    Log.d(TAG, "migrateLegacyCartIfNeeded: migrated ${items.size} items")
+                }
+            } else {
+                prefs.edit().putBoolean(migratedKey, true).apply()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "migrateLegacyCartIfNeeded failed", e)
+            // If migration fails, do not mark as migrated to retry next startup
+        }
+    }
     
     private var selectedProduct: Product? = null
 
@@ -79,10 +122,18 @@ class OverlayService : Service() {
 
     private val shortcuts = mutableListOf<String>()
     private lateinit var productManager: ProductManager
-    private lateinit var cartManager: CartManager
+    private lateinit var cartRepository: CartRepository
     private lateinit var cartAdapter: CartAdapter
-    private lateinit var imageManager: ImageManager
-    private lateinit var galleryModalAdapter: GalleryModalAdapter
+    private lateinit var galleryModalAdapter: GalleryOverlayAdapter
+    private lateinit var galleryRepository: GalleryImageRepository
+    private val serviceScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var galleryJob: Job? = null
+    private var latestGalleryUi: List<GalleryImage> = emptyList()
+    private var cartJob: Job? = null
+    private var latestCartUi: List<CartItem> = emptyList()
+    private lateinit var favoriteRepository: FavoriteGenericRepository
+    private var favoritesJob: Job? = null
+    private var latestFavoritesUi: List<Favorite> = emptyList()
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -90,13 +141,15 @@ class OverlayService : Service() {
         super.onCreate()
         startInForeground()
         initCriticalViews() // Solo burbuja y abanico inicialmente
-        showBubble()
         
         // Inicializar ProductManager, CartManager y otras vistas en segundo plano
         Thread {
             productManager = ProductManager(this)
-            cartManager = CartManager(this)
-            imageManager = ImageManager(this)
+            cartRepository = CartRepository(this)
+            galleryRepository = GalleryImageRepository(this)
+            favoriteRepository = FavoriteGenericRepository(this)
+            // One-time migration from legacy SharedPreferences cart to Room
+            migrateLegacyCartIfNeeded()
             initSecondaryViews() // Modales y diálogos después
         }.start()
     }
@@ -114,9 +167,7 @@ class OverlayService : Service() {
         return START_STICKY
     }
     
-    companion object {
-        const val ACTION_SHOW_BUBBLE = "SHOW_BUBBLE"
-    }
+    
 
     override fun onDestroy() {
         super.onDestroy()
@@ -145,6 +196,10 @@ class OverlayService : Service() {
         if (::favoritesView.isInitialized && favoritesView.isAttachedToWindow) {
             windowManager.removeView(favoritesView)
         }
+        galleryJob?.cancel()
+        cartJob?.cancel()
+        favoritesJob?.cancel()
+        serviceScope.cancel()
     }
 
     private fun startInForeground() {
@@ -239,6 +294,8 @@ class OverlayService : Service() {
                     dimAmount = 0.4f
                 }
                 setupGalleryViewListeners()
+                // Comenzar a observar la galería desde Room
+                startObservingGallery()
 
                 // --- Inicializar Cart Modal ---
                 cartView = inflater.inflate(R.layout.cart_modal, null)
@@ -249,6 +306,8 @@ class OverlayService : Service() {
                     dimAmount = 0.4f
                 }
                 setupCartViewListeners()
+                // Observar carrito desde Room
+                startObservingCart()
 
                 // --- Inicializar Favorites Modal ---
                 favoritesView = inflater.inflate(R.layout.favorites_modal, null)
@@ -259,6 +318,8 @@ class OverlayService : Service() {
                     dimAmount = 0.4f
                 }
                 setupFavoritesViewListeners()
+                // Comenzar a observar favoritos desde Room
+                startObservingFavorites()
 
                 loadShortcutsFromPrefs()
                 populateCatalogShortcuts()
@@ -688,7 +749,7 @@ class OverlayService : Service() {
         val recyclerView = galleryView.findViewById<RecyclerView>(R.id.gallery_modal_recycler)
         recyclerView.layoutManager = StaggeredGridLayoutManager(3, StaggeredGridLayoutManager.VERTICAL)
         
-        galleryModalAdapter = GalleryModalAdapter(mutableListOf()) { image ->
+        galleryModalAdapter = GalleryOverlayAdapter(mutableListOf()) { image ->
             shareImageFromGallery(image)
             collapseToBubble()
         }
@@ -723,6 +784,9 @@ class OverlayService : Service() {
         
         // Actualizar carrito cuando se muestre
         updateCartDisplay()
+
+        // Comenzar a observar cambios del carrito
+        startObservingCart()
     }
 
     private fun setupFavoritesViewListeners() {
@@ -746,10 +810,28 @@ class OverlayService : Service() {
     private fun updateFavoritesOverlayDisplay() {
         val recyclerView = favoritesView.findViewById<RecyclerView>(R.id.favorites_recycler_overlay) ?: return
         val adapter = recyclerView.adapter as? FavoritesAdapter ?: return
-        val list = try { FavoritesManager(this).getAll() } catch (_: Exception) { emptyList() }
+        val list = latestFavoritesUi
         adapter.setData(list)
         val empty = favoritesView.findViewById<TextView>(R.id.empty_favorites_overlay)
         empty?.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
+    }
+
+    private fun startObservingFavorites() {
+        favoritesJob?.cancel()
+        favoritesJob = serviceScope.launch {
+            favoriteRepository.observeAll().collectLatest { entities ->
+                latestFavoritesUi = entities.mapNotNull { e ->
+                    val type = runCatching { FavoriteType.valueOf(e.type) }.getOrNull() ?: return@mapNotNull null
+                    Favorite(
+                        id = e.id,
+                        type = type,
+                        name = e.name,
+                        content = e.content
+                    )
+                }
+                updateFavoritesOverlayDisplay()
+            }
+        }
     }
 
     private fun onOverlayFavoriteClick(fav: Favorite) {
@@ -843,9 +925,9 @@ class OverlayService : Service() {
     }
 
     private fun updateCartDisplay() {
-        if (!::cartManager.isInitialized || !::cartAdapter.isInitialized) return
+        if (!::cartAdapter.isInitialized) return
         runOnUiThread {
-            val items = cartManager.getCartItems()
+            val items = latestCartUi
             cartAdapter.updateItems(items)
 
             // Actualizar total
@@ -863,6 +945,94 @@ class OverlayService : Service() {
                 emptyMessage.visibility = View.GONE
                 recyclerView.visibility = View.VISIBLE
             }
+        }
+    }
+
+    private fun startObservingCart() {
+        cartJob?.cancel()
+        cartJob = serviceScope.launch {
+            cartRepository.observeAll().collectLatest { entities ->
+                Log.d(TAG, "Cart observeAll emitted ${entities.size} items")
+                latestCartUi = entities.map { e ->
+                    val product = Product(
+                        id = e.productId,
+                        name = e.name,
+                        price = e.price,
+                        link = e.link,
+                        imageUri = e.imageUri
+                    )
+                    CartItem(product = product, quantity = e.quantity)
+                }
+                updateCartDisplay()
+            }
+        }
+    }
+
+    private fun addProductToCart(product: Product) {
+        serviceScope.launch {
+            // Calcular cantidad nueva basado en estado actual
+            val current = try { cartRepository.getAllOnce().firstOrNull { it.productId == product.id } } catch (_: Exception) { null }
+            val newQty = (current?.quantity ?: 0) + 1
+            Log.d(TAG, "addProductToCart: ${product.id} newQty=$newQty")
+            cartRepository.upsert(product, newQty)
+            runOnUiThread {
+                Toast.makeText(this@OverlayService, getString(R.string.toast_product_added), Toast.LENGTH_SHORT).show()
+            }
+        }
+        hideShareDialog()
+    }
+
+    private fun updateCartItemQuantity(cartItem: CartItem, newQuantity: Int) {
+        val pid = cartItem.product.id
+        serviceScope.launch {
+            Log.d(TAG, "updateCartItemQuantity: $pid -> $newQuantity")
+            cartRepository.updateQuantity(pid, newQuantity)
+        }
+    }
+
+    private fun clearCart() {
+        serviceScope.launch {
+            Log.d(TAG, "clearCart invoked")
+            cartRepository.clear()
+            runOnUiThread {
+                Toast.makeText(this@OverlayService, getString(R.string.toast_cart_emptied), Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun shareCart() {
+        val items = latestCartUi
+        if (items.isEmpty()) {
+            Toast.makeText(this, getString(R.string.toast_cart_empty), Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val sb = StringBuilder()
+        sb.append(getString(R.string.cart_text_title)).append("\n\n")
+        Log.d(TAG, "shareCart items=${items.size}")
+        items.forEach { item ->
+            sb.append("• ").append(item.product.name)
+                .append(" x").append(item.quantity)
+                .append(" = ")
+                .append(CurrencyUtils.formatAmount(this, item.totalPrice))
+                .append("\n")
+        }
+        val total = items.sumOf { it.totalPrice }
+        sb.append("\n").append("Total: ")
+            .append(CurrencyUtils.formatAmount(this, total))
+
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, sb.toString())
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            val chooser = Intent.createChooser(shareIntent, getString(R.string.chooser_share_cart))
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(chooser)
+        } catch (_: Exception) {
+            copyTextToClipboard(sb.toString())
+            Toast.makeText(this, getString(R.string.toast_product_copied), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -1315,103 +1485,18 @@ class OverlayService : Service() {
             copyTextToClipboard(text)
         }
     }
-    
-    
-    // Cart functionality methods
-    private fun addProductToCart(product: Product) {
-        if (::cartManager.isInitialized) {
-            val success = cartManager.addToCart(product)
-            if (success) {
-                Toast.makeText(this, getString(R.string.toast_product_added), Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this, getString(R.string.toast_product_add_error), Toast.LENGTH_SHORT).show()
-            }
-        }
-        hideShareDialog()
-    }
-    
-    private fun updateCartItemQuantity(cartItem: com.livecopilot.data.CartItem, newQuantity: Int) {
-        if (::cartManager.isInitialized) {
-            if (newQuantity <= 0) {
-                cartManager.removeFromCart(cartItem.product.id)
-            } else {
-                cartManager.updateQuantity(cartItem.product.id, newQuantity)
-            }
-            updateCartDisplay()
-        }
-    }
-    
-    private fun clearCart() {
-        if (::cartManager.isInitialized) {
-            cartManager.clearCart()
-            updateCartDisplay()
-            Toast.makeText(this, getString(R.string.toast_cart_emptied), Toast.LENGTH_SHORT).show()
-        }
-    }
-    
-    private fun shareCart() {
-        if (::cartManager.isInitialized) {
-            val cartItems = cartManager.getCartItems()
-            if (cartItems.isEmpty()) {
-                Toast.makeText(this, getString(R.string.toast_cart_empty), Toast.LENGTH_SHORT).show()
-                return
-            }
-            
-            // Ocultar el carrito antes de mostrar el diálogo de compartir
-            hideAllViews()
-            collapseToBubble()
-            
-            val cartText = generateCartText(cartItems)
-            val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                type = "text/plain"
-                putExtra(Intent.EXTRA_TEXT, cartText)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            
-            try {
-                val chooser = Intent.createChooser(shareIntent, getString(R.string.chooser_share_cart))
-                chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                startActivity(chooser)
-            } catch (e: Exception) {
-                copyTextToClipboard(cartText)
-                Toast.makeText(this, getString(R.string.toast_product_copied), Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-    
-    private fun generateCartText(cartItems: List<com.livecopilot.data.CartItem>): String {
-        val builder = StringBuilder()
-        builder.append(getString(R.string.cart_text_title) + "\n")
-        builder.append("━━━━━━━━━━━━━━━━━━━━━━━\n\n")
 
-        var total = 0.0
-        cartItems.forEach { item ->
-            val subtotal = item.product.price * item.quantity
-            total += subtotal
-            builder.append("• ${item.product.name}\n")
-            builder.append("  ${getString(R.string.cart_text_quantity)}: ${item.quantity}\n")
-            builder.append("  ${getString(R.string.cart_text_price)}: ${CurrencyUtils.formatAmount(this, item.product.price)}\n")
-            builder.append("  ${getString(R.string.cart_text_subtotal)}: ${CurrencyUtils.formatAmount(this, subtotal)}\n\n")
-        }
-
-        builder.append("━━━━━━━━━━━━━━━━━━━━━━━\n")
-        builder.append("💰 ${getString(R.string.cart_text_total)}: ${CurrencyUtils.formatAmount(this, total)}\n\n")
-        builder.append(getString(R.string.cart_text_footer))
-        
-        return builder.toString()
-    }
-    
     // Gallery modal functionality methods
     private fun updateGalleryModalDisplay() {
-        if (::imageManager.isInitialized && ::galleryModalAdapter.isInitialized) {
+        if (::galleryModalAdapter.isInitialized && ::galleryView.isInitialized) {
             runOnUiThread {
-                val images = imageManager.getAllImages()
+                val images = latestGalleryUi
                 galleryModalAdapter.updateImages(images)
-                
+
                 // Mostrar/ocultar mensaje de galería vacía
                 val emptyMessage = galleryView.findViewById<TextView>(R.id.empty_gallery_modal_message)
                 val recyclerView = galleryView.findViewById<RecyclerView>(R.id.gallery_modal_recycler)
-                
+
                 if (images.isEmpty()) {
                     emptyMessage.visibility = View.VISIBLE
                     recyclerView.visibility = View.GONE
@@ -1419,6 +1504,24 @@ class OverlayService : Service() {
                     emptyMessage.visibility = View.GONE
                     recyclerView.visibility = View.VISIBLE
                 }
+            }
+        }
+    }
+
+    private fun startObservingGallery() {
+        galleryJob?.cancel()
+        galleryJob = serviceScope.launch {
+            galleryRepository.observeAll().collectLatest { entities ->
+                latestGalleryUi = entities.map { e ->
+                    com.livecopilot.data.GalleryImage(
+                        id = e.id,
+                        name = e.name,
+                        imagePath = e.imagePath,
+                        description = e.description,
+                        dateAdded = e.dateAdded
+                    )
+                }
+                updateGalleryModalDisplay()
             }
         }
     }
