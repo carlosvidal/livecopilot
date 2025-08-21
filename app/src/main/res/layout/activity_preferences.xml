@@ -54,13 +54,46 @@
             android:layout_height="wrap_content"
             android:spinnerMode="dropdown" />
 
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="16dp" />
+
+        <TextView
+            android:id="@+id/text_plan_label_pref"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Plan actual: Free (24 ítems)"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingBottom="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Activar Pro" />
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/switch_plan_pref"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
         <Button
             android:id="@+id/btn_save_prefs"
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:layout_marginTop="24dp"
             android:text="Guardar"
-            android:textAllCaps="false" />
+            android:textAllCaps="false"
+            android:backgroundTint="@color/settings_primary"
+            android:textColor="@android:color/white" />
 
     </LinearLayout>
 

@@ -11,11 +11,16 @@ import android.widget.Spinner
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import android.widget.Toast
+import androidx.appcompat.widget.SwitchCompat
+import android.widget.TextView
+import com.livecopilot.data.Plan
+import com.livecopilot.data.PlanManager
 
 class PreferencesActivity : AppCompatActivity() {
 
     private lateinit var languageSpinner: Spinner
     private lateinit var currencySpinner: Spinner
+    private lateinit var planManager: PlanManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,8 +35,12 @@ class PreferencesActivity : AppCompatActivity() {
         toolbar.setTitleTextColor(Color.WHITE)
         toolbar.navigationIcon?.setTint(Color.WHITE)
 
+        planManager = PlanManager(this)
+
         languageSpinner = findViewById(R.id.spinner_language)
         currencySpinner = findViewById(R.id.spinner_currency)
+        val planSwitch = findViewById<SwitchCompat>(R.id.switch_plan_pref)
+        val planLabel = findViewById<TextView>(R.id.text_plan_label_pref)
 
         // Setup adapters
         val langAdapter = ArrayAdapter.createFromResource(
@@ -50,6 +59,18 @@ class PreferencesActivity : AppCompatActivity() {
 
         // Load existing values
         loadPreferences()
+
+        // Init plan UI
+        fun refreshLabel() {
+            val isPro = planManager.isPro()
+            planLabel.text = if (isPro) "Plan actual: Pro (ilimitado)" else "Plan actual: Free (24 ítems)"
+            planSwitch.isChecked = isPro
+        }
+        refreshLabel()
+        planSwitch.setOnCheckedChangeListener { _, isChecked ->
+            planManager.setPlan(if (isChecked) Plan.PRO else Plan.FREE)
+            refreshLabel()
+        }
 
         findViewById<Button>(R.id.btn_save_prefs).setOnClickListener {
             savePreferences()

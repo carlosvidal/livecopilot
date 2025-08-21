@@ -40,6 +40,14 @@ class FavoritesActivity : AppCompatActivity() {
         contentInputRef?.setText(uri.toString())
     }
 
+    private fun showLimitDialogFavorites() {
+        AlertDialog.Builder(this)
+            .setTitle("Límite alcanzado")
+            .setMessage("Has alcanzado el límite de 24 favoritos en el plan Free.\n\nActiva Pro en Preferencias para agregar ilimitados.")
+            .setPositiveButton("OK", null)
+            .show()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_favorites)
@@ -62,7 +70,13 @@ class FavoritesActivity : AppCompatActivity() {
         recycler.adapter = adapter
 
         fab = findViewById(R.id.fab_add_favorite)
-        fab.setOnClickListener { showAddFavoriteDialog() }
+        fab.setOnClickListener {
+            if (!favoritesManager.canAddMore()) {
+                showLimitDialogFavorites()
+            } else {
+                showAddFavoriteDialog()
+            }
+        }
 
         loadFavorites()
     }
@@ -180,6 +194,10 @@ class FavoritesActivity : AppCompatActivity() {
         dialog.setOnShowListener {
             val btnSave = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
             btnSave.setOnClickListener {
+                if (!favoritesManager.canAddMore()) {
+                    showLimitDialogFavorites()
+                    return@setOnClickListener
+                }
                 nameInput.error = null
                 contentInput.error = null
 

@@ -10,6 +10,7 @@ class FavoritesManager(private val context: Context) {
     private val prefs: SharedPreferences by lazy {
         context.getSharedPreferences("favorites_prefs", Context.MODE_PRIVATE)
     }
+    private val planManager by lazy { PlanManager(context) }
 
     fun getAll(): List<Favorite> {
         val json = prefs.getString(KEY, "[]") ?: "[]"
@@ -46,6 +47,10 @@ class FavoritesManager(private val context: Context) {
         val list = getAll().filterNot { it.id == id }
         save(list)
     }
+
+    fun count(): Int = getAll().size
+    fun canAddMore(): Boolean = planManager.isPro() || count() < PlanManager.MAX_FREE_ITEMS
+    fun remainingSlots(): Int = if (planManager.isPro()) Int.MAX_VALUE else (PlanManager.MAX_FREE_ITEMS - count())
 
     private fun save(list: List<Favorite>) {
         val arr = JSONArray()

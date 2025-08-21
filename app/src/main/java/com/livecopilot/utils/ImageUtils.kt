@@ -3,6 +3,7 @@ package com.livecopilot.utils
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.net.Uri
 import android.util.Log
 import java.io.File
@@ -10,6 +11,7 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.util.UUID
+import androidx.exifinterface.media.ExifInterface
 
 object ImageUtils {
     
@@ -25,42 +27,46 @@ object ImageUtils {
      */
     fun copyImageToInternalStorage(context: Context, sourceUri: Uri): String? {
         return try {
-            val inputStream = context.contentResolver.openInputStream(sourceUri)
-            inputStream?.use { stream ->
-                // Generar nombre único para la imagen
-                val fileName = "img_${UUID.randomUUID()}.jpg"
-                val imagesDir = File(context.filesDir, IMAGES_DIR)
-                
-                // Crear directorio si no existe
-                if (!imagesDir.exists()) {
-                    imagesDir.mkdirs()
-                }
-                
-                val destinationFile = File(imagesDir, fileName)
-                
-                // Leer y optimizar la imagen
-                val originalBitmap = BitmapFactory.decodeStream(stream)
-                val optimizedBitmap = optimizeBitmap(originalBitmap)
-                
-                // Guardar imagen optimizada
-                FileOutputStream(destinationFile).use { outputStream ->
-                    optimizedBitmap.compress(Bitmap.CompressFormat.JPEG, 85, outputStream)
-                }
-                
-                // Liberar memoria
-                if (originalBitmap != optimizedBitmap) {
-                    originalBitmap.recycle()
-                }
-                optimizedBitmap.recycle()
-                
-                Log.d(TAG, "Imagen copiada exitosamente: ${destinationFile.absolutePath}")
-                destinationFile.absolutePath
+            val resolver = context.contentResolver
+            val mime = resolver.getType(sourceUri) ?: "image/jpeg"
+            
+            // Directorio destino
+            val imagesDir = File(context.filesDir, IMAGES_DIR)
+            if (!imagesDir.exists()) imagesDir.mkdirs()
+            
+            // Decodificación con sampling para limitar tamaño y memoria
+            val sampled = decodeSampledBitmap(context, sourceUri, MAX_IMAGE_SIZE)
+                ?: return null
+            
+            // Corregir orientación EXIF si aplica
+            val rotated = rotateBitmapIfRequired(context, sourceUri, sampled)
+            
+            // Selección de formato: preserva PNG si tiene alpha o si el MIME original es PNG
+            val hasAlpha = rotated.hasAlpha()
+            val usePng = hasAlpha || mime.equals("image/png", ignoreCase = true)
+            val format = if (usePng) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG
+            val ext = if (usePng) "png" else "jpg"
+            val fileName = "img_${UUID.randomUUID()}.$ext"
+            val destinationFile = File(imagesDir, fileName)
+            
+            FileOutputStream(destinationFile).use { outputStream ->
+                val quality = if (format == Bitmap.CompressFormat.JPEG) 85 else 100
+                rotated.compress(format, quality, outputStream)
             }
+            
+            if (rotated != sampled) sampled.recycle()
+            rotated.recycle()
+            
+            Log.d(TAG, "Imagen copiada exitosamente: ${destinationFile.absolutePath}")
+            destinationFile.absolutePath
         } catch (e: IOException) {
             Log.e(TAG, "Error copiando imagen: ${e.message}")
             null
         } catch (e: SecurityException) {
             Log.e(TAG, "Error de permisos: ${e.message}")
+            null
+        } catch (e: Exception) {
+            Log.e(TAG, "Error inesperado copiando imagen: ${e.message}")
             null
         }
     }
@@ -105,28 +111,75 @@ object ImageUtils {
     }
     
     /**
-     * Optimiza una imagen para reducir su tamaño
+     * Decodifica con inSampleSize para evitar OOM y limitar al tamaño máximo.
      */
-    private fun optimizeBitmap(originalBitmap: Bitmap): Bitmap {
-        val originalWidth = originalBitmap.width
-        val originalHeight = originalBitmap.height
-        
-        // Si la imagen ya es pequeña, no hacer nada
-        if (originalWidth <= MAX_IMAGE_SIZE && originalHeight <= MAX_IMAGE_SIZE) {
-            return originalBitmap
+    private fun decodeSampledBitmap(context: Context, uri: Uri, maxSize: Int): Bitmap? {
+        return try {
+            val resolver = context.contentResolver
+            // 1) Solo bounds
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+
+            val (w, h) = bounds.outWidth to bounds.outHeight
+            if (w <= 0 || h <= 0) return null
+
+            // 2) Calcular inSampleSize como potencia de 2
+            val inSample = calculateInSampleSize(w, h, maxSize, maxSize)
+
+            val opts = BitmapFactory.Options().apply {
+                inSampleSize = inSample
+                inPreferredConfig = Bitmap.Config.ARGB_8888
+            }
+            resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
+        } catch (e: Exception) {
+            Log.e(TAG, "decodeSampledBitmap error: ${e.message}")
+            null
         }
-        
-        // Calcular nuevo tamaño manteniendo proporción
-        val scaleFactor = if (originalWidth > originalHeight) {
-            MAX_IMAGE_SIZE.toFloat() / originalWidth
-        } else {
-            MAX_IMAGE_SIZE.toFloat() / originalHeight
+    }
+
+    private fun calculateInSampleSize(width: Int, height: Int, reqWidth: Int, reqHeight: Int): Int {
+        var inSampleSize = 1
+        if (height > reqHeight || width > reqWidth) {
+            var halfHeight = height / 2
+            var halfWidth = width / 2
+            while ((halfHeight / inSampleSize) >= reqHeight && (halfWidth / inSampleSize) >= reqWidth) {
+                inSampleSize *= 2
+            }
         }
-        
-        val newWidth = (originalWidth * scaleFactor).toInt()
-        val newHeight = (originalHeight * scaleFactor).toInt()
-        
-        return Bitmap.createScaledBitmap(originalBitmap, newWidth, newHeight, true)
+        return inSampleSize
+    }
+
+    /**
+     * Rota el bitmap según EXIF si es necesario.
+     */
+    private fun rotateBitmapIfRequired(context: Context, uri: Uri, bitmap: Bitmap): Bitmap {
+        return try {
+            val resolver = context.contentResolver
+            resolver.openInputStream(uri)?.use { input ->
+                val exif = ExifInterface(input)
+                when (exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
+                    ExifInterface.ORIENTATION_ROTATE_90 -> rotateBitmap(bitmap, 90f)
+                    ExifInterface.ORIENTATION_ROTATE_180 -> rotateBitmap(bitmap, 180f)
+                    ExifInterface.ORIENTATION_ROTATE_270 -> rotateBitmap(bitmap, 270f)
+                    ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> flipBitmap(bitmap, horizontal = true)
+                    ExifInterface.ORIENTATION_FLIP_VERTICAL -> flipBitmap(bitmap, horizontal = false)
+                    else -> bitmap
+                }
+            } ?: bitmap
+        } catch (e: Exception) {
+            Log.w(TAG, "No se pudo leer EXIF: ${e.message}")
+            bitmap
+        }
+    }
+
+    private fun rotateBitmap(src: Bitmap, angle: Float): Bitmap {
+        val matrix = Matrix().apply { postRotate(angle) }
+        return Bitmap.createBitmap(src, 0, 0, src.width, src.height, matrix, true)
+    }
+
+    private fun flipBitmap(src: Bitmap, horizontal: Boolean): Bitmap {
+        val matrix = Matrix().apply { preScale(if (horizontal) -1f else 1f, if (horizontal) 1f else -1f) }
+        return Bitmap.createBitmap(src, 0, 0, src.width, src.height, matrix, true)
     }
     
     /**

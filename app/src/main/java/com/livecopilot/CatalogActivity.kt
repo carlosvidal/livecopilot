@@ -59,6 +59,8 @@ class CatalogActivity : AppCompatActivity() {
         
         recyclerView.layoutManager = GridLayoutManager(this, 2)
         recyclerView.adapter = adapter
+        recyclerView.setHasFixedSize(true)
+        recyclerView.setItemViewCacheSize(20)
         recyclerView.addItemDecoration(GridSpacingItemDecoration(2, 12.dp(), includeEdge = true))
         
         fabAddProduct.setOnClickListener {
