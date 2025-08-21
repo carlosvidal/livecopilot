@@ -4,11 +4,14 @@ import android.app.Application
 import android.content.Context
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
+import com.livecopilot.data.migration.ProductMigrations
 
 class LiveCopilotApp : Application() {
     override fun onCreate() {
         super.onCreate()
         applySavedLocale(this)
+        // Migrate existing SharedPreferences-based products into Room (one-time if DB is empty)
+        ProductMigrations.migratePrefsToRoomIfNeeded(this)
     }
 
     companion object {
