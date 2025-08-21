@@ -6,6 +6,13 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.livecopilot.utils.ImageUtils
 import java.util.UUID
+import com.livecopilot.data.local.entity.ProductEntity
+import com.livecopilot.data.local.entity.ProductImageEntity
+import com.livecopilot.data.repository.ProductImageRepository
+import com.livecopilot.data.repository.ProductRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class ProductManager(private val context: Context) {
     
@@ -14,6 +21,9 @@ class ProductManager(private val context: Context) {
     }
     private val gson by lazy { Gson() }
     private val planManager by lazy { PlanManager(context) }
+    private val ioScope by lazy { CoroutineScope(Dispatchers.IO) }
+    private val productRepo by lazy { ProductRepository(context) }
+    private val imageRepo by lazy { ProductImageRepository(context) }
     
     companion object {
         private const val KEY_PRODUCTS = "products"
@@ -45,6 +55,23 @@ class ProductManager(private val context: Context) {
         
         products.add(productWithId)
         saveProducts(products)
+        // Mirror into Room in background
+        ioScope.launch {
+            runCatching {
+                productRepo.upsert(productWithId.toEntity())
+                // Sync primary image if exists
+                if (productWithId.imageUri.isNotEmpty()) {
+                    imageRepo.deleteByProductId(productWithId.id)
+                    imageRepo.upsertAll(listOf(
+                        ProductImageEntity(
+                            productId = productWithId.id,
+                            uri = productWithId.imageUri,
+                            position = 0
+                        )
+                    ))
+                }
+            }
+        }
         return AddProductResult.SUCCESS
     }
     
@@ -62,6 +89,22 @@ class ProductManager(private val context: Context) {
         if (old.imageUri.isNotEmpty() && old.imageUri != product.imageUri) {
             ImageUtils.deleteImage(old.imageUri)
         }
+        // Mirror into Room in background
+        ioScope.launch {
+            runCatching {
+                productRepo.upsert(product.toEntity())
+                imageRepo.deleteByProductId(product.id)
+                if (product.imageUri.isNotEmpty()) {
+                    imageRepo.upsertAll(listOf(
+                        ProductImageEntity(
+                            productId = product.id,
+                            uri = product.imageUri,
+                            position = 0
+                        )
+                    ))
+                }
+            }
+        }
         
         return true
     }
@@ -76,6 +119,13 @@ class ProductManager(private val context: Context) {
             toDelete?.imageUri?.takeIf { it.isNotEmpty() }?.let { ImageUtils.deleteImage(it) }
             // Limpieza de huérfanas en directorio interno
             cleanupOrphanImages()
+            // Mirror delete into Room in background
+            ioScope.launch {
+                runCatching {
+                    productRepo.deleteById(productId)
+                    imageRepo.deleteByProductId(productId)
+                }
+            }
         }
         return removed
     }
@@ -106,6 +156,16 @@ class ProductManager(private val context: Context) {
         val used = getAllProducts().mapNotNull { it.imageUri.takeIf { uri -> uri.isNotEmpty() } }
         ImageUtils.cleanupUnusedImages(context, used)
     }
+
+    private fun Product.toEntity(): ProductEntity = ProductEntity(
+        id = this.id,
+        name = this.name,
+        description = this.description.ifBlank { null },
+        priceCents = (this.price * 100).toInt(),
+        currency = "USD",
+        isAvailable = true,
+        updatedAt = System.currentTimeMillis()
+    )
     
     enum class AddProductResult {
         SUCCESS,

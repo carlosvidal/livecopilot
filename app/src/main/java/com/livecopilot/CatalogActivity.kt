@@ -14,9 +14,14 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView.ItemDecoration
 import androidx.recyclerview.widget.RecyclerView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.livecopilot.data.Product
 import com.livecopilot.data.ProductManager
+import com.livecopilot.data.repository.ProductRepository
+import kotlinx.coroutines.launch
 
 class CatalogActivity : AppCompatActivity() {
     
@@ -25,6 +30,7 @@ class CatalogActivity : AppCompatActivity() {
     private lateinit var fabAddProduct: FloatingActionButton
     private lateinit var emptyView: TextView
     private lateinit var productManager: ProductManager
+    private lateinit var productRepository: ProductRepository
     private val products = mutableListOf<Product>()
     private var selectionMode: Boolean = false
     
@@ -43,8 +49,10 @@ class CatalogActivity : AppCompatActivity() {
         toolbar.overflowIcon?.setTint(Color.WHITE)
         
         productManager = ProductManager(this)
+        productRepository = ProductRepository(this)
         setupViews()
         loadProducts()
+        observeRoomProducts()
     }
     
     private fun setupViews() {
@@ -180,6 +188,17 @@ class CatalogActivity : AppCompatActivity() {
                 fabAddProduct.alpha = 0.5f
             } else {
                 fabAddProduct.alpha = 1.0f
+            }
+        }
+    }
+    
+    private fun observeRoomProducts() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                productRepository.observeAll().collect {
+                    // Mantener compatibilidad: refrescamos desde ProductManager mientras migramos
+                    loadProducts()
+                }
             }
         }
     }
